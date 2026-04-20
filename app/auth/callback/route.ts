@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     if (profileError) {
       console.error('Failed to upsert user profile:', profileError)
     }
+  }
 
   // If the OAuth provider returned an access token (e.g. Instagram), store it
   if (data.session && data.session.provider_token) {
@@ -94,3 +95,4 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.redirect(`${origin}${next}`)
 }
+
