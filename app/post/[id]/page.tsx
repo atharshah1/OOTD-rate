@@ -265,6 +265,7 @@ export default function PostPage() {
         open={showShareModal}
         onOpenChange={setShowShareModal}
         postId={postId}
+        username={post.users?.username}
         mediaUrl={currentMedia?.media_url}
         mediaType={currentMedia?.media_type}
         caption={post.caption}
