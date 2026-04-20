@@ -42,6 +42,15 @@ export function UploadForm() {
     }
   }, [files])
 
+  const cleanupUploads = async (paths: string[]) => {
+    if (paths.length === 0) return
+
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(paths)
+    if (error) {
+      console.error('Error cleaning up uploaded files:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -83,6 +92,7 @@ export function UploadForm() {
         const file = files[i]
         const fileExt = file.name.split('.').pop() || 'bin'
         const fileName = `${user.id}/${post.id}/${Date.now()}-${i}.${fileExt}`
+        let uploadedPath: string | null = null
         
         try {
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -97,7 +107,7 @@ export function UploadForm() {
             throw uploadError
           }
 
-          uploadedPaths.push(uploadData.path)
+          uploadedPath = uploadData.path
 
           const { data: publicUrlData } = supabase.storage
             .from(STORAGE_BUCKET)
@@ -107,6 +117,8 @@ export function UploadForm() {
             throw new Error('No public URL returned from storage')
           }
 
+          uploadedPaths.push(uploadedPath)
+
           uploadedMedia.push({
             post_id: post.id,
             media_url: publicUrlData.publicUrl,
@@ -114,15 +126,16 @@ export function UploadForm() {
             order_index: i,
           })
         } catch (error) {
+          if (uploadedPath) {
+            await cleanupUploads([uploadedPath])
+          }
           console.error('Error uploading file:', error)
           toast.error(`Failed to upload file ${i + 1}`)
         }
       }
 
       if (uploadedMedia.length === 0) {
-        if (uploadedPaths.length > 0) {
-          await supabase.storage.from(STORAGE_BUCKET).remove(uploadedPaths)
-        }
+        await cleanupUploads(uploadedPaths)
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to upload media')
         return
@@ -134,9 +147,7 @@ export function UploadForm() {
         .insert(uploadedMedia)
 
       if (mediaError) {
-        if (uploadedPaths.length > 0) {
-          await supabase.storage.from(STORAGE_BUCKET).remove(uploadedPaths)
-        }
+        await cleanupUploads(uploadedPaths)
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to save media')
         return
