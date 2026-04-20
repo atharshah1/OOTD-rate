@@ -102,15 +102,19 @@ export default function PostPage() {
       ? post.ratings.reduce((sum, r) => sum + r.rating, 0) / post.ratings.length
       : 0
 
+  const usernamePossessive = (username: string) =>
+    username.toLowerCase().endsWith('s') ? `${username}'` : `${username}'s`
+
   const shareOverallScore = async () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
     const postUrl = `${baseUrl}/post/${postId}`
-    const message = `@${post.users?.username}'s OOTD is currently rated ${averageRating.toFixed(1)}/5 from ${post.ratings.length} rating${post.ratings.length !== 1 ? 's' : ''}. Rate it here 👗`
+    const displayName = post.users?.username || 'someone'
+    const message = `@${usernamePossessive(displayName)} OOTD is currently rated ${averageRating.toFixed(1)}/5 from ${post.ratings.length} rating${post.ratings.length !== 1 ? 's' : ''}. Rate it here 👗`
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `@${post.users?.username}'s OOTD score`,
+          title: `@${usernamePossessive(displayName)} OOTD score`,
           text: message,
           url: postUrl,
         })

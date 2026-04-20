@@ -90,7 +90,7 @@ export function CommentsSection({ postId, username }: CommentsSectionProps) {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
     const postUrl = `${baseUrl}/post/${postId}`
     const commentText = truncateForShare(comment.comment)
-    const message = `Anonymous feedback on @${username}'s OOTD: "${commentText}" 👗`
+    const message = `anonymous feedback on @${username}'s OOTD: "${commentText}" 👗`
 
     try {
       if (navigator.share) {
