@@ -58,7 +58,7 @@ export async function generateMetadata({
               url: firstMedia.media_url,
               width: 1200,
               height: 1200,
-              alt: "OOTD outfit photo",
+              alt: post.caption || 'Outfit of the day photo',
             },
           ]
         : [],
