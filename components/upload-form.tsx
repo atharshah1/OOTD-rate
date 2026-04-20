@@ -117,14 +117,14 @@ export function UploadForm() {
             throw new Error('No public URL returned from storage')
           }
 
-          uploadedPaths.push(uploadedPath)
-
           uploadedMedia.push({
             post_id: post.id,
             media_url: publicUrlData.publicUrl,
             media_type: file.type.startsWith('image') ? 'image' : 'video',
             order_index: i,
           })
+
+          uploadedPaths.push(uploadedPath)
         } catch (error) {
           if (uploadedPath) {
             await cleanupUploads([uploadedPath])
