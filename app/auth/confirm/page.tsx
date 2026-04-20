@@ -1,12 +1,16 @@
-'use client'
-
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
-export default function ConfirmEmailPage() {
-  const searchParams = useSearchParams()
-  const nextPathRaw = searchParams.get('next') || '/upload'
+type ConfirmEmailPageProps = {
+  searchParams?: Promise<{
+    next?: string | string[]
+  }>
+}
+
+export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPageProps) {
+  const params = (await searchParams) ?? {}
+  const nextValue = params.next
+  const nextPathRaw = (Array.isArray(nextValue) ? nextValue[0] : nextValue) || '/upload'
   const nextPath = nextPathRaw.startsWith('/') ? nextPathRaw : '/upload'
 
   return (
