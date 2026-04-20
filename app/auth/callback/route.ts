@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
       (user.user_metadata?.preferred_username as string | undefined) ??
       (user.user_metadata?.user_name as string | undefined) ??
       (user.user_metadata?.name as string | undefined) ??
-      (user.email ? user.email.split('@')[0] : 'user')
+      (user.email ? user.email.split('@')[0] : `user_${user.id.slice(0, 8)}`)
 
-    await serviceClient.from('users').upsert(
+    const { error: profileError } = await serviceClient.from('users').upsert(
       {
         id: user.id,
         email: user.email ?? '',
@@ -67,7 +67,9 @@ export async function GET(request: NextRequest) {
       },
       { onConflict: 'id', ignoreDuplicates: true }
     )
-  }
+    if (profileError) {
+      console.error('Failed to upsert user profile:', profileError)
+    }
 
   // If the OAuth provider returned an access token (e.g. Instagram), store it
   if (data.session && data.session.provider_token) {

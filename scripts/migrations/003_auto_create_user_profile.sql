@@ -23,7 +23,8 @@ BEGIN
       NEW.raw_user_meta_data->>'preferred_username',
       NEW.raw_user_meta_data->>'user_name',
       NEW.raw_user_meta_data->>'name',
-      split_part(NEW.email, '@', 1)
+      split_part(NEW.email, '@', 1),
+      'user_' || left(NEW.id::text, 8)
     )
   )
   ON CONFLICT (id) DO NOTHING;
