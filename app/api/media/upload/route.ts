@@ -4,6 +4,22 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 const STORAGE_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'media'
+const ALLOWED_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'avif',
+  'heic',
+  'heif',
+  'mp4',
+  'mov',
+  'webm',
+  'm4v',
+  'avi',
+  'mkv',
+])
 
 async function getAuthenticatedUser() {
   const cookieStore = await cookies()
@@ -85,6 +101,9 @@ export async function POST(request: NextRequest) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: 'Missing file' }, { status: 400 })
   }
+  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+    return NextResponse.json({ error: 'Only image and video files are allowed' }, { status: 400 })
+  }
 
   const { post } = await ensureUserOwnsPost(postIdRaw, user.id, supabase)
   if (!post) {
@@ -100,14 +119,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 
-  const fileExt = file.name.split('.').pop() || 'bin'
-  const safeExt = fileExt.replace(/[^a-zA-Z0-9]/g, '') || 'bin'
+  const fileExt = (file.name.split('.').pop() || '').toLowerCase()
+  const safeExt = fileExt.replace(/[^a-z0-9]/g, '')
+  if (!ALLOWED_EXTENSIONS.has(safeExt)) {
+    return NextResponse.json({ error: 'Unsupported media file type' }, { status: 400 })
+  }
   const filePath = `${user.id}/${postIdRaw}/${Date.now()}-${crypto.randomUUID()}.${safeExt}`
 
   const { error: uploadError } = await serviceClient.storage
     .from(STORAGE_BUCKET)
     .upload(filePath, file, {
-      cacheControl: '3600',
+      cacheControl: '3600s',
       upsert: false,
       contentType: file.type || undefined,
     })

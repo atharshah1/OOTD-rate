@@ -53,7 +53,7 @@ export function UploadForm() {
       })
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
+        const data = await safeJson(response)
         throw new Error(data.error || 'Cleanup request failed')
       }
     } catch (error) {
@@ -71,12 +71,20 @@ export function UploadForm() {
       body: formData,
     })
 
-    const data = await response.json().catch(() => ({}))
+    const data = await safeJson(response)
     if (!response.ok) {
       throw new Error(data.error || 'Upload failed')
     }
 
     return data as { mediaUrl: string; mediaType: 'image' | 'video'; path: string }
+  }
+
+  const safeJson = async (response: Response): Promise<Record<string, string>> => {
+    try {
+      return await response.json()
+    } catch {
+      return {}
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
