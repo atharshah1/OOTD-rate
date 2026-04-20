@@ -69,6 +69,8 @@ export function ShareModal({
     setLoading(true)
     try {
       const slug = `${postId.slice(0, 8)}-${Math.random().toString(36).substr(2, 9)}`
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+      const fallbackPostUrl = `${baseUrl}/post/${postId}`
 
       const { data: existingShare } = await supabase
         .from('shares')
@@ -90,6 +92,13 @@ export function ShareModal({
           .single()
 
         if (error) {
+          if (error.code === '42501') {
+            setShareUrl(fallbackPostUrl)
+            toast.info('Using post link for sharing')
+            setLoading(false)
+            return
+          }
+
           const { data: fallbackShare } = await supabase
             .from('shares')
             .select('share_slug')
@@ -97,7 +106,8 @@ export function ShareModal({
             .maybeSingle()
 
           if (!fallbackShare) {
-            toast.error('Failed to generate share link')
+            setShareUrl(fallbackPostUrl)
+            toast.info('Using post link for sharing')
             setLoading(false)
             return
           }
@@ -108,11 +118,12 @@ export function ShareModal({
         }
       }
 
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
       setShareUrl(`${baseUrl}/share/${finalSlug}`)
     } catch (error) {
       console.error('Error:', error)
-      toast.error('Failed to generate share link')
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+      setShareUrl(`${baseUrl}/post/${postId}`)
+      toast.info('Using post link for sharing')
     } finally {
       setLoading(false)
     }
