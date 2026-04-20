@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -25,6 +25,12 @@ interface ShareModalProps {
   caption?: string
 }
 
+// Keeps fallback responsive while giving the native app time to open.
+const APP_LAUNCH_FALLBACK_MS = 1400
+const STORY_SHARE_CTA = 'Rate my OOTD anonymously 👗'
+const hasTouchInterface = () =>
+  navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches
+
 export function ShareModal({
   open,
   onOpenChange,
@@ -39,6 +45,7 @@ export function ShareModal({
   const [copied, setCopied] = useState(false)
   const [hasInstagramToken, setHasInstagramToken] = useState(false)
   const [igPosting, setIgPosting] = useState(false)
+  const storyLaunchCleanupRef = useRef<(() => void) | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -48,6 +55,14 @@ export function ShareModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, postId])
+
+  useEffect(
+    () => () => {
+      storyLaunchCleanupRef.current?.()
+      storyLaunchCleanupRef.current = null
+    },
+    []
+  )
 
   const checkInstagramConnection = async () => {
     const {
@@ -147,7 +162,7 @@ export function ShareModal({
   const buildStoryClipboardText = () => {
     const cleanedCaption = caption?.trim()
     const captionBlock = cleanedCaption ? `${cleanedCaption}\n\n` : ''
-    return `${captionBlock}Rate my OOTD anonymously 👗\n${shareUrl}`
+    return `${captionBlock}${STORY_SHARE_CTA}\n${shareUrl}`
   }
 
   const openInstagramStory = async () => {
@@ -160,9 +175,8 @@ export function ShareModal({
     }
 
     const storyWebUrl = 'https://www.instagram.com/create/story/'
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
-    if (!isMobile) {
+    if (!hasTouchInterface()) {
       openInNewTab(storyWebUrl)
       toast.success(
         'Story text copied. Paste it in Instagram Story and add the link/reply sticker.'
@@ -170,18 +184,32 @@ export function ShareModal({
       return
     }
 
-    const fallbackTimer = window.setTimeout(() => {
-      window.location.assign(storyWebUrl)
-    }, 1400)
+    storyLaunchCleanupRef.current?.()
+
+    let fallbackTimer: ReturnType<typeof window.setTimeout> | undefined
 
     const onVisibilityChange = () => {
       if (document.hidden) {
-        window.clearTimeout(fallbackTimer)
-        document.removeEventListener('visibilitychange', onVisibilityChange)
+        cleanup()
+        storyLaunchCleanupRef.current = null
       }
     }
 
+    const cleanup = () => {
+      if (fallbackTimer !== undefined) {
+        window.clearTimeout(fallbackTimer)
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+
+    fallbackTimer = window.setTimeout(() => {
+      cleanup()
+      window.location.assign(storyWebUrl)
+    }, APP_LAUNCH_FALLBACK_MS)
+
+    storyLaunchCleanupRef.current = cleanup
     document.addEventListener('visibilitychange', onVisibilityChange)
+    // Instagram deep link opens the native Story camera when installed; otherwise fallback timer redirects to web.
     window.location.href = 'instagram://story-camera'
     toast.success(
       'Opening Instagram Story… text copied, now paste and add the link/reply sticker.'
