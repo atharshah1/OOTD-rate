@@ -9,11 +9,11 @@ import { Sparkles } from 'lucide-react'
 
 export default function SignUpPage() {
   const [mounted, setMounted] = useState(false)
-  const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
     setMounted(true)
+    const supabase = createClient()
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
@@ -21,7 +21,7 @@ export default function SignUpPage() {
       }
     }
     checkAuth()
-  }, [supabase.auth, router])
+  }, [router])
 
   if (!mounted) return null
 
