@@ -11,6 +11,7 @@ import { ShareModal } from '@/components/share-modal'
 import { Loader2, Star, Share2, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 interface Post {
   id: string
@@ -100,6 +101,35 @@ export default function PostPage() {
     post.ratings.length > 0
       ? post.ratings.reduce((sum, r) => sum + r.rating, 0) / post.ratings.length
       : 0
+
+  const usernamePossessive = (username: string) =>
+    username.toLowerCase().endsWith('s') ? `${username}'` : `${username}'s`
+
+  const shareOverallScore = async () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const postUrl = `${baseUrl}/post/${postId}`
+    const displayName = post.users?.username || 'someone'
+    const message =
+      post.ratings.length > 0
+        ? `@${usernamePossessive(displayName)} OOTD is currently rated ${averageRating.toFixed(1)}/5 from ${post.ratings.length} rating${post.ratings.length !== 1 ? 's' : ''}. Rate it here 👗`
+        : `Be the first to rate @${usernamePossessive(displayName)} OOTD 👗`
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `@${usernamePossessive(displayName)} OOTD score`,
+          text: message,
+          url: postUrl,
+        })
+        return
+      }
+
+      await navigator.clipboard.writeText(`${message} ${postUrl}`)
+      toast.success('Copied! Paste this into your Instagram Story or post.')
+    } catch {
+      toast.error('Unable to share right now')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -222,6 +252,14 @@ export default function PostPage() {
                     )
                   })}
                 </div>
+                <Button
+                  onClick={shareOverallScore}
+                  variant="outline"
+                  className="w-full border-border mt-2"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share Overall Score
+                </Button>
               </div>
             </Card>
 
@@ -249,7 +287,7 @@ export default function PostPage() {
 
         {/* Comments Section */}
         <div className="mt-12 max-w-2xl">
-          <CommentsSection postId={postId} />
+          <CommentsSection postId={postId} username={post.users?.username || 'someone'} />
         </div>
       </main>
 

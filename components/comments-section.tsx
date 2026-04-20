@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Comment {
@@ -22,9 +21,24 @@ interface Comment {
 
 interface CommentsSectionProps {
   postId: string
+  username: string
 }
 
-export function CommentsSection({ postId }: CommentsSectionProps) {
+const MAX_SHARED_COMMENT_LENGTH = 180
+
+const truncateForShare = (text: string) => {
+  const normalized = text.trim()
+  if (normalized.length <= MAX_SHARED_COMMENT_LENGTH) return normalized
+
+  const truncated = normalized.slice(0, MAX_SHARED_COMMENT_LENGTH)
+  const lastSpaceIndex = truncated.lastIndexOf(' ')
+  const safeTruncated =
+    lastSpaceIndex > -1 ? truncated.slice(0, lastSpaceIndex) : truncated
+
+  return `${safeTruncated}...`
+}
+
+export function CommentsSection({ postId, username }: CommentsSectionProps) {
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -72,6 +86,29 @@ export function CommentsSection({ postId }: CommentsSectionProps) {
     )
   }
 
+  const shareComment = async (comment: Comment) => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const postUrl = `${baseUrl}/post/${postId}`
+    const commentText = truncateForShare(comment.comment)
+    const message = `anonymous feedback on @${username}'s OOTD: "${commentText}" 👗`
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `@${username}'s OOTD feedback`,
+          text: message,
+          url: postUrl,
+        })
+        return
+      }
+
+      await navigator.clipboard.writeText(`${message} ${postUrl}`)
+      toast.success('Copied! Paste this into your Instagram Story or post.')
+    } catch {
+      toast.error('Unable to share this comment right now')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="font-semibold text-lg">Comments</h3>
@@ -110,6 +147,15 @@ export function CommentsSection({ postId }: CommentsSectionProps) {
                   </p>
                 </div>
                 <p className="text-sm">{comment.comment}</p>
+                <Button
+                  onClick={() => shareComment(comment)}
+                  variant="outline"
+                  size="sm"
+                  className="border-border mt-2"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share comment
+                </Button>
               </div>
             </Card>
           ))}
