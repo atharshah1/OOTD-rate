@@ -11,7 +11,8 @@ export function middleware(request: NextRequest) {
     callbackUrl.searchParams.set('code', code)
 
     const next = searchParams.get('next')
-    if (next) {
+    // Only forward relative paths to prevent open-redirect attacks
+    if (next && next.startsWith('/') && !next.startsWith('//')) {
       callbackUrl.searchParams.set('next', next)
     }
 
