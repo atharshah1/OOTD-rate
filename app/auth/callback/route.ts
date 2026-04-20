@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
@@ -40,6 +41,31 @@ export async function GET(request: NextRequest) {
     console.error('OAuth callback error:', error)
     return NextResponse.redirect(
       `${origin}/auth/signin?error=${encodeURIComponent(error.message)}`
+    )
+  }
+
+  // Ensure the user has a row in public.users (required by the posts FK).
+  // The DB trigger handles brand-new signups; this upsert covers existing auth
+  // users who signed up before the trigger was added.
+  if (data.session) {
+    const { user } = data.session
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const defaultUsername =
+      (user.user_metadata?.preferred_username as string | undefined) ??
+      (user.user_metadata?.user_name as string | undefined) ??
+      (user.user_metadata?.name as string | undefined) ??
+      (user.email ? user.email.split('@')[0] : 'user')
+
+    await serviceClient.from('users').upsert(
+      {
+        id: user.id,
+        email: user.email ?? '',
+        username: defaultUsername,
+      },
+      { onConflict: 'id', ignoreDuplicates: true }
     )
   }
 
