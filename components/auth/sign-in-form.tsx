@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,7 +16,10 @@ export function SignInForm() {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<'google' | 'instagram' | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+  const nextPathRaw = searchParams.get('next') || '/feed'
+  const nextPath = nextPathRaw.startsWith('/') ? nextPathRaw : '/feed'
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,7 +35,7 @@ export function SignInForm() {
         toast.error(error.message)
       } else if (data.user) {
         toast.success('Signed in successfully!')
-        router.push('/feed')
+        router.push(nextPath)
         router.refresh()
       }
     } catch (error) {
@@ -48,7 +51,7 @@ export function SignInForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider as Provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           scopes:
             provider === 'instagram'
               ? 'instagram_basic,instagram_content_publish'

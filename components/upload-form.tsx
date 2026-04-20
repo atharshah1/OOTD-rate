@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { put } from '@vercel/blob'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
@@ -41,6 +40,53 @@ export function UploadForm() {
     }
   }, [files])
 
+  const cleanupUploads = async (postId: string, paths: string[]) => {
+    if (paths.length === 0) return
+
+    try {
+      const response = await fetch('/api/media/upload', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId, paths }),
+      })
+
+      if (!response.ok) {
+        const data = await safeJson(response)
+        throw new Error(data.error || 'Cleanup request failed')
+      }
+    } catch (error) {
+      console.error('Error cleaning up uploaded files:', error)
+    }
+  }
+
+  const uploadMediaFile = async (postId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('postId', postId)
+    formData.append('file', file)
+
+    const response = await fetch('/api/media/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    const data = await safeJson(response)
+    if (!response.ok) {
+      throw new Error(data.error || 'Upload failed')
+    }
+
+    return data as { mediaUrl: string; mediaType: 'image' | 'video'; path: string }
+  }
+
+  const safeJson = async (response: Response): Promise<Record<string, string>> => {
+    try {
+      return await response.json()
+    } catch {
+      return {}
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -76,30 +122,39 @@ export function UploadForm() {
       }
 
       // Upload media files
-      const uploadedMedia = []
+      const uploadedMedia: Array<{
+        post_id: string
+        media_url: string
+        media_type: 'image' | 'video'
+        order_index: number
+      }> = []
+      const uploadedPaths: string[] = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${user.id}/${post.id}/${Date.now()}-${i}.${fileExt}`
         
         try {
-          const blob = await put(fileName, file, {
-            access: 'public',
-          })
+          const uploaded = await uploadMediaFile(post.id, file)
 
           uploadedMedia.push({
             post_id: post.id,
-            media_url: blob.url,
-            media_type: file.type.startsWith('image') ? 'image' : 'video',
+            media_url: uploaded.mediaUrl,
+            media_type: uploaded.mediaType,
             order_index: i,
           })
+
+          uploadedPaths.push(uploaded.path)
         } catch (error) {
           console.error('Error uploading file:', error)
-          toast.error(`Failed to upload file ${i + 1}`)
+          toast.error(
+            error instanceof Error
+              ? `Failed to upload file ${i + 1}: ${error.message}`
+              : `Failed to upload file ${i + 1}`
+          )
         }
       }
 
       if (uploadedMedia.length === 0) {
+        await cleanupUploads(post.id, uploadedPaths)
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to upload media')
         return
@@ -111,6 +166,7 @@ export function UploadForm() {
         .insert(uploadedMedia)
 
       if (mediaError) {
+        await cleanupUploads(post.id, uploadedPaths)
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to save media')
         return

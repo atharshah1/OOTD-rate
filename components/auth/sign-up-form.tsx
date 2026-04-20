@@ -32,7 +32,7 @@ export function SignUpForm() {
         toast.error(error.message)
       } else if (data.user) {
         toast.success('Sign up successful! Check your email to confirm.')
-        router.push('/auth/confirm')
+        router.push('/auth/confirm?next=/upload')
       }
     } catch (error) {
       toast.error('An error occurred during sign up')
@@ -47,7 +47,7 @@ export function SignUpForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider as Provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/upload')}`,
           scopes:
             provider === 'instagram'
               ? 'instagram_basic,instagram_content_publish'
