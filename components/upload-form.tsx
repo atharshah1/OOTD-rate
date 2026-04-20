@@ -10,8 +10,6 @@ import { Loader2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Image from 'next/image'
 
-const STORAGE_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'media'
-
 export function UploadForm() {
   const [files, setFiles] = useState<File[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
@@ -42,13 +40,43 @@ export function UploadForm() {
     }
   }, [files])
 
-  const cleanupUploads = async (paths: string[]) => {
+  const cleanupUploads = async (postId: string, paths: string[]) => {
     if (paths.length === 0) return
 
-    const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(paths)
-    if (error) {
+    try {
+      const response = await fetch('/api/media/upload', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId, paths }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Cleanup request failed')
+      }
+    } catch (error) {
       console.error('Error cleaning up uploaded files:', error)
     }
+  }
+
+  const uploadMediaFile = async (postId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('postId', postId)
+    formData.append('file', file)
+
+    const response = await fetch('/api/media/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.error || 'Upload failed')
+    }
+
+    return data as { mediaUrl: string; mediaType: 'image' | 'video'; path: string }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,56 +114,39 @@ export function UploadForm() {
       }
 
       // Upload media files
-      const uploadedMedia = []
+      const uploadedMedia: Array<{
+        post_id: string
+        media_url: string
+        media_type: 'image' | 'video'
+        order_index: number
+      }> = []
       const uploadedPaths: string[] = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const fileExt = file.name.split('.').pop() || 'bin'
-        const fileName = `${user.id}/${post.id}/${Date.now()}-${i}.${fileExt}`
-        let uploadedPath: string | null = null
         
         try {
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from(STORAGE_BUCKET)
-            .upload(fileName, file, {
-              cacheControl: '3600',
-              upsert: false,
-              contentType: file.type,
-            })
-
-          if (uploadError) {
-            throw uploadError
-          }
-
-          uploadedPath = uploadData.path
-
-          const { data: publicUrlData } = supabase.storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(uploadData.path)
-
-          if (!publicUrlData.publicUrl) {
-            throw new Error('No public URL returned from storage')
-          }
+          const uploaded = await uploadMediaFile(post.id, file)
 
           uploadedMedia.push({
             post_id: post.id,
-            media_url: publicUrlData.publicUrl,
-            media_type: file.type.startsWith('image') ? 'image' : 'video',
+            media_url: uploaded.mediaUrl,
+            media_type: uploaded.mediaType,
             order_index: i,
           })
 
-          uploadedPaths.push(uploadedPath)
+          uploadedPaths.push(uploaded.path)
         } catch (error) {
-          if (uploadedPath) {
-            await cleanupUploads([uploadedPath])
-          }
           console.error('Error uploading file:', error)
-          toast.error(`Failed to upload file ${i + 1}`)
+          toast.error(
+            error instanceof Error
+              ? `Failed to upload file ${i + 1}: ${error.message}`
+              : `Failed to upload file ${i + 1}`
+          )
         }
       }
 
       if (uploadedMedia.length === 0) {
-        await cleanupUploads(uploadedPaths)
+        await cleanupUploads(post.id, uploadedPaths)
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to upload media')
         return
@@ -147,7 +158,7 @@ export function UploadForm() {
         .insert(uploadedMedia)
 
       if (mediaError) {
-        await cleanupUploads(uploadedPaths)
+        await cleanupUploads(post.id, uploadedPaths)
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to save media')
         return
