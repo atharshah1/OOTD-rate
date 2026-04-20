@@ -98,17 +98,17 @@ export default function ProfilePage() {
         .single()
 
       if (error && error.code === 'PGRST116') {
-        const { data: { user } } = await supabase.auth.getUser()
-        const newProfile = {
-          id: userId,
-          email: user?.email || '',
-          username: user?.email?.split('@')[0] || 'user',
-          avatar_url: null,
-          bio: null,
+        // Profile row doesn't exist yet — create it via the server-side API so
+        // that the service-role key is used (no RLS issues).
+        const res = await fetch('/api/profile', { method: 'POST' })
+        if (res.ok) {
+          const newProfile = await res.json()
+          setUser(newProfile)
+          setEditedUsername(newProfile.username)
+          setEditedBio(newProfile.bio || '')
+        } else {
+          console.error('Failed to auto-create profile')
         }
-        setUser(newProfile)
-        setEditedUsername(newProfile.username)
-        setEditedBio(newProfile.bio || '')
       } else if (data) {
         setUser(data)
         setEditedUsername(data.username)
@@ -213,19 +213,13 @@ export default function ProfilePage() {
 
   const handleUpdateProfile = async () => {
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) return
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: editedUsername, bio: editedBio }),
+      })
 
-      const { error } = await supabase
-        .from('users')
-        .upsert({
-          id: authUser.id,
-          email: authUser.email || '',
-          username: editedUsername,
-          bio: editedBio,
-        })
-
-      if (error) {
+      if (!res.ok) {
         toast.error('Failed to update profile')
       } else {
         toast.success('Profile updated!')
