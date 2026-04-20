@@ -155,14 +155,12 @@ export function ShareModal({
   }
 
   const openInstagramStory = async () => {
-    if (!shareUrl) return
+    if (!shareUrl.trim()) return
 
     try {
       await navigator.clipboard.writeText(shareUrl)
     } catch {
-      toast.error(
-        'Unable to copy link automatically. Use the "Copy Link for Stories" button below.'
-      )
+      toast.error('Unable to copy link automatically. Use the copy button below.')
     }
 
     const storyWebUrl = 'https://www.instagram.com/create/story/'
