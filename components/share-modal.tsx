@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Loader2, Copy, Check, Share2, ExternalLink } from 'lucide-react'
+import { Loader2, Copy, Check, Share2, ExternalLink, Instagram } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ShareModalProps {
@@ -24,6 +24,12 @@ interface ShareModalProps {
   mediaType?: string
   caption?: string
 }
+
+// Delays web fallback briefly so the native Instagram app can launch first.
+const APP_LAUNCH_FALLBACK_MS = 1400
+const STORY_SHARE_CTA = 'Rate my OOTD anonymously 👗'
+const hasTouchInterface = () =>
+  navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches
 
 export function ShareModal({
   open,
@@ -39,6 +45,7 @@ export function ShareModal({
   const [copied, setCopied] = useState(false)
   const [hasInstagramToken, setHasInstagramToken] = useState(false)
   const [igPosting, setIgPosting] = useState(false)
+  const storyLaunchCleanupRef = useRef<(() => void) | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -48,6 +55,14 @@ export function ShareModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, postId])
+
+  useEffect(
+    () => () => {
+      storyLaunchCleanupRef.current?.()
+      storyLaunchCleanupRef.current = null
+    },
+    []
+  )
 
   const checkInstagramConnection = async () => {
     const {
@@ -71,10 +86,12 @@ export function ShareModal({
     const fallbackPostUrl = `${baseUrl}/post/${postId}`
 
     try {
-      const randomSuffix = globalThis.crypto?.randomUUID
-        ? globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
-        : Math.random().toString(36).slice(2, 11).padEnd(9, '0')
-      const slug = `${postId.slice(0, 8)}-${randomSuffix}`
+      const makeSlug = () => {
+        const randomSuffix = globalThis.crypto?.randomUUID
+          ? globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
+          : Math.random().toString(36).slice(2, 11).padEnd(9, '0')
+        return `${postId.slice(0, 8)}-${randomSuffix}`
+      }
 
       const { data: existingShare } = await supabase
         .from('shares')
@@ -82,44 +99,52 @@ export function ShareModal({
         .eq('post_id', postId)
         .maybeSingle()
 
-      let finalSlug = slug
-      if (existingShare) {
+      let finalSlug: string | null = null
+      if (existingShare?.share_slug) {
         finalSlug = existingShare.share_slug
       } else {
-        const { data: insertedShare, error } = await supabase
-          .from('shares')
-          .insert({
-            post_id: postId,
-            share_slug: slug,
-          })
-          .select('share_slug')
-          .single()
+        let lastInsertError: { code?: string; message?: string } | null = null
 
-        if (error) {
-          if (error.code === '42501') {
-            setShareUrl(fallbackPostUrl)
-            toast.info('Using post link for sharing')
-            setLoading(false)
-            return
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const candidateSlug = makeSlug()
+          const { error: insertError } = await supabase.from('shares').insert({
+            post_id: postId,
+            share_slug: candidateSlug,
+          })
+
+          if (!insertError) {
+            finalSlug = candidateSlug
+            break
           }
 
+          lastInsertError = insertError
+          if (insertError.code !== '23505') {
+            break
+          }
+        }
+
+        if (lastInsertError && lastInsertError.code !== '23505') {
+          console.error('Share link insert failed:', lastInsertError)
+          toast.error('Could not create a share link right now')
+        }
+
+        if (!finalSlug) {
           const { data: fallbackShare } = await supabase
             .from('shares')
             .select('share_slug')
             .eq('post_id', postId)
             .maybeSingle()
 
-          if (!fallbackShare) {
-            setShareUrl(fallbackPostUrl)
-            toast.info('Using post link for sharing')
-            setLoading(false)
-            return
+          if (fallbackShare?.share_slug) {
+            finalSlug = fallbackShare.share_slug
           }
-
-          finalSlug = fallbackShare.share_slug
-        } else if (insertedShare?.share_slug) {
-          finalSlug = insertedShare.share_slug
         }
+      }
+
+      if (!finalSlug) {
+        setShareUrl(fallbackPostUrl)
+        toast.info('Using post link for sharing')
+        return
       }
 
       setShareUrl(`${baseUrl}/share/${finalSlug}`)
@@ -142,6 +167,63 @@ export function ShareModal({
     } catch {
       toast.error('Unable to copy link. Please copy it manually.')
     }
+  }
+
+  const buildStoryClipboardText = () => {
+    const cleanedCaption = caption?.trim()
+    const captionBlock = cleanedCaption ? `${cleanedCaption}\n\n` : ''
+    return `${captionBlock}${STORY_SHARE_CTA}\n${shareUrl}`
+  }
+
+  const openInstagramStory = async () => {
+    if (!shareUrl) return
+
+    try {
+      await navigator.clipboard.writeText(buildStoryClipboardText())
+    } catch {
+      toast.error('Unable to copy story text automatically')
+    }
+
+    const storyWebUrl = 'https://www.instagram.com/create/story/'
+
+    if (!hasTouchInterface()) {
+      openInNewTab(storyWebUrl)
+      toast.success(
+        'Story text copied. Paste it in Instagram Story and add the link/reply sticker.'
+      )
+      return
+    }
+
+    storyLaunchCleanupRef.current?.()
+
+    let fallbackTimer: ReturnType<typeof window.setTimeout> | undefined
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        cleanup()
+        storyLaunchCleanupRef.current = null
+      }
+    }
+
+    const cleanup = () => {
+      if (fallbackTimer !== undefined) {
+        window.clearTimeout(fallbackTimer)
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+
+    fallbackTimer = window.setTimeout(() => {
+      cleanup()
+      window.location.assign(storyWebUrl)
+    }, APP_LAUNCH_FALLBACK_MS)
+
+    storyLaunchCleanupRef.current = cleanup
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    // Instagram deep link opens the native Story camera when installed; otherwise fallback timer redirects to web.
+    window.location.href = 'instagram://story-camera'
+    toast.success(
+      'Opening Instagram Story… text copied, now paste and add the link/reply sticker.'
+    )
   }
 
   const postToInstagram = async () => {
@@ -249,12 +331,23 @@ export function ShareModal({
 
               {/* How to share instructions */}
               <div className="text-xs text-muted-foreground text-center space-y-0.5">
-                <p>Copy this link → go to Instagram Story → tap the link sticker</p>
-                <p className="font-medium text-foreground">Paste the link there 🔗</p>
+                <p>Tap Open Instagram Story to launch the app (or web fallback)</p>
+                <p className="font-medium text-foreground">
+                  Then paste and add the link/reply sticker 🔗
+                </p>
               </div>
 
               {/* Primary CTAs */}
               <div className="space-y-2">
+                <Button
+                  onClick={openInstagramStory}
+                  disabled={!shareUrl}
+                  className="w-full h-11 text-sm font-semibold bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 hover:opacity-90 text-white gap-2"
+                >
+                  <Instagram className="w-4 h-4" />
+                  Open Instagram Story
+                </Button>
+
                 <Button
                   onClick={copyToClipboard}
                   disabled={!shareUrl}

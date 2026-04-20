@@ -92,6 +92,37 @@ CREATE POLICY "Anyone can view media for public posts" ON media FOR SELECT
       AND (posts.visibility = 'public' OR auth.uid() = posts.user_id)
     )
   );
+CREATE POLICY "Post owners can add media" ON media FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM posts
+      WHERE posts.id = media.post_id
+        AND posts.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Post owners can update media" ON media FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM posts
+      WHERE posts.id = media.post_id
+        AND posts.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM posts
+      WHERE posts.id = media.post_id
+        AND posts.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Post owners can delete media" ON media FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM posts
+      WHERE posts.id = media.post_id
+        AND posts.user_id = auth.uid()
+    )
+  );
 
 -- RLS Policies for ratings
 CREATE POLICY "Anyone can view ratings for public posts" ON ratings FOR SELECT

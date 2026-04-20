@@ -99,15 +99,21 @@ export function UploadForm() {
         }
       }
 
-      // Insert media records
-      if (uploadedMedia.length > 0) {
-        const { error: mediaError } = await supabase
-          .from('media')
-          .insert(uploadedMedia)
+      if (uploadedMedia.length === 0) {
+        await supabase.from('posts').delete().eq('id', post.id)
+        toast.error('Failed to upload media')
+        return
+      }
 
-        if (mediaError) {
-          toast.error('Failed to save media')
-        }
+      // Insert media records
+      const { error: mediaError } = await supabase
+        .from('media')
+        .insert(uploadedMedia)
+
+      if (mediaError) {
+        await supabase.from('posts').delete().eq('id', post.id)
+        toast.error('Failed to save media')
+        return
       }
 
       toast.success('OOTD posted successfully!')
