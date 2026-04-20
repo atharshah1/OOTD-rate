@@ -74,21 +74,37 @@ export function ShareModal({
         .from('shares')
         .select('share_slug')
         .eq('post_id', postId)
-        .single()
+        .maybeSingle()
 
       let finalSlug = slug
       if (existingShare) {
         finalSlug = existingShare.share_slug
       } else {
-        const { error } = await supabase.from('shares').insert({
-          post_id: postId,
-          share_slug: slug,
-        })
+        const { data: insertedShare, error } = await supabase
+          .from('shares')
+          .insert({
+            post_id: postId,
+            share_slug: slug,
+          })
+          .select('share_slug')
+          .single()
 
-        if (error && !error.message.includes('duplicate')) {
-          toast.error('Failed to generate share link')
-          setLoading(false)
-          return
+        if (error) {
+          const { data: fallbackShare } = await supabase
+            .from('shares')
+            .select('share_slug')
+            .eq('post_id', postId)
+            .maybeSingle()
+
+          if (!fallbackShare) {
+            toast.error('Failed to generate share link')
+            setLoading(false)
+            return
+          }
+
+          finalSlug = fallbackShare.share_slug
+        } else if (insertedShare?.share_slug) {
+          finalSlug = insertedShare.share_slug
         }
       }
 
@@ -102,11 +118,16 @@ export function ShareModal({
     }
   }
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(shareUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast.success('Link copied! Paste it as a link sticker on your Story 📲')
+  const copyToClipboard = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success('Link copied! Paste it as a link sticker on your Story 📲')
+    } catch {
+      toast.error('Unable to copy link. Please copy it manually.')
+    }
   }
 
   const postToInstagram = async () => {
@@ -160,6 +181,14 @@ export function ShareModal({
         })
     } else {
       copyToClipboard()
+    }
+  }
+
+  const openInNewTab = (url: string) => {
+    if (!shareUrl) return
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      toast.error('Unable to open share link. Please allow pop-ups and try again.')
     }
   }
 
@@ -277,8 +306,9 @@ export function ShareModal({
                       const text = encodeURIComponent(
                         `Rate my OOTD anonymously 👗 ${shareUrl}`
                       )
-                      window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank')
+                      openInNewTab(`https://twitter.com/intent/tweet?text=${text}`)
                     }}
+                    disabled={!shareUrl}
                     className="w-full bg-blue-500 hover:bg-blue-600 text-white text-sm"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
@@ -286,11 +316,11 @@ export function ShareModal({
                   </Button>
                   <Button
                     onClick={() => {
-                      window.open(
-                        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
-                        '_blank'
+                      openInNewTab(
+                        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
                       )
                     }}
+                    disabled={!shareUrl}
                     className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
@@ -301,8 +331,9 @@ export function ShareModal({
                       const text = encodeURIComponent(
                         `Rate my OOTD anonymously 👗 ${shareUrl}`
                       )
-                      window.open(`https://wa.me/?text=${text}`, '_blank')
+                      openInNewTab(`https://wa.me/?text=${text}`)
                     }}
+                    disabled={!shareUrl}
                     variant="outline"
                     className="w-full border-border text-sm"
                   >

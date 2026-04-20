@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { put } from '@vercel/blob'
@@ -13,6 +13,7 @@ import Image from 'next/image'
 
 export function UploadForm() {
   const [files, setFiles] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const [caption, setCaption] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [loading, setLoading] = useState(false)
@@ -30,6 +31,15 @@ export function UploadForm() {
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
+
+  useEffect(() => {
+    const urls = files.map((file) => URL.createObjectURL(file))
+    setPreviewUrls(urls)
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [files])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -147,12 +157,7 @@ export function UploadForm() {
               <div key={index} className="relative group">
                 <div className="aspect-square bg-muted rounded-lg overflow-hidden relative">
                   {file.type.startsWith('image') ? (
-                    <Image
-                      src={URL.createObjectURL(file)}
-                      alt={`Preview ${index}`}
-                      fill
-                      className="object-cover"
-                    />
+                    <Image src={previewUrls[index] || ''} alt={`Preview ${index}`} fill className="object-cover" unoptimized />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-card text-muted-foreground">
                       <span className="text-xs">Video</span>
