@@ -67,10 +67,11 @@ export function ShareModal({
 
   const generateShareLink = async () => {
     setLoading(true)
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const fallbackPostUrl = `${baseUrl}/post/${postId}`
+
     try {
       const slug = `${postId.slice(0, 8)}-${Math.random().toString(36).substr(2, 9)}`
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-      const fallbackPostUrl = `${baseUrl}/post/${postId}`
 
       const { data: existingShare } = await supabase
         .from('shares')
@@ -121,8 +122,7 @@ export function ShareModal({
       setShareUrl(`${baseUrl}/share/${finalSlug}`)
     } catch (error) {
       console.error('Error:', error)
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-      setShareUrl(`${baseUrl}/post/${postId}`)
+      setShareUrl(fallbackPostUrl)
       toast.info('Using post link for sharing')
     } finally {
       setLoading(false)
