@@ -71,7 +71,7 @@ export function ShareModal({
     const fallbackPostUrl = `${baseUrl}/post/${postId}`
 
     try {
-      const slug = `${postId.slice(0, 8)}-${Math.random().toString(36).substr(2, 9)}`
+      const slug = `${postId.slice(0, 8)}-${Math.random().toString(36).substring(2, 11)}`
 
       const { data: existingShare } = await supabase
         .from('shares')

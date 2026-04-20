@@ -24,6 +24,8 @@ interface CommentsSectionProps {
   username: string
 }
 
+const MAX_SHARED_COMMENT_LENGTH = 180
+
 export function CommentsSection({ postId, username }: CommentsSectionProps) {
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +77,9 @@ export function CommentsSection({ postId, username }: CommentsSectionProps) {
   const shareComment = async (comment: Comment) => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
     const postUrl = `${baseUrl}/post/${postId}`
-    const commentText = comment.comment.trim().slice(0, 180)
+    const commentText = comment.comment
+      .trim()
+      .slice(0, MAX_SHARED_COMMENT_LENGTH)
     const message = `Anonymous feedback on @${username}'s OOTD: "${commentText}" 👗`
 
     try {
