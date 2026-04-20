@@ -115,6 +115,7 @@ export function ShareModal({
 
     setIgPosting(true)
     try {
+      // Videos are posted as Instagram Reels; images go to the Feed
       const endpoint =
         mediaType === 'video' ? '/api/instagram/reel' : '/api/instagram/post'
       const body =
@@ -144,6 +145,7 @@ export function ShareModal({
   }
 
   const shareNative = () => {
+    if (!shareUrl) return
     if (navigator.share) {
       navigator.share({
         title: 'Check out my OOTD!',
