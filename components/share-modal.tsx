@@ -86,10 +86,12 @@ export function ShareModal({
     const fallbackPostUrl = `${baseUrl}/post/${postId}`
 
     try {
-      const randomSuffix = globalThis.crypto?.randomUUID
-        ? globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
-        : Math.random().toString(36).slice(2, 11).padEnd(9, '0')
-      const slug = `${postId.slice(0, 8)}-${randomSuffix}`
+      const makeSlug = () => {
+        const randomSuffix = globalThis.crypto?.randomUUID
+          ? globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
+          : Math.random().toString(36).slice(2, 11).padEnd(9, '0')
+        return `${postId.slice(0, 8)}-${randomSuffix}`
+      }
 
       const { data: existingShare } = await supabase
         .from('shares')
@@ -97,44 +99,44 @@ export function ShareModal({
         .eq('post_id', postId)
         .maybeSingle()
 
-      let finalSlug = slug
-      if (existingShare) {
+      let finalSlug: string | null = null
+      if (existingShare?.share_slug) {
         finalSlug = existingShare.share_slug
       } else {
-        const { data: insertedShare, error } = await supabase
-          .from('shares')
-          .insert({
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const candidateSlug = makeSlug()
+          const { error: insertError } = await supabase.from('shares').insert({
             post_id: postId,
-            share_slug: slug,
+            share_slug: candidateSlug,
           })
-          .select('share_slug')
-          .single()
 
-        if (error) {
-          if (error.code === '42501') {
-            setShareUrl(fallbackPostUrl)
-            toast.info('Using post link for sharing')
-            setLoading(false)
-            return
+          if (!insertError) {
+            finalSlug = candidateSlug
+            break
           }
 
+          if (insertError.code !== '23505') {
+            break
+          }
+        }
+
+        if (!finalSlug) {
           const { data: fallbackShare } = await supabase
             .from('shares')
             .select('share_slug')
             .eq('post_id', postId)
             .maybeSingle()
 
-          if (!fallbackShare) {
-            setShareUrl(fallbackPostUrl)
-            toast.info('Using post link for sharing')
-            setLoading(false)
-            return
+          if (fallbackShare?.share_slug) {
+            finalSlug = fallbackShare.share_slug
           }
-
-          finalSlug = fallbackShare.share_slug
-        } else if (insertedShare?.share_slug) {
-          finalSlug = insertedShare.share_slug
         }
+      }
+
+      if (!finalSlug) {
+        setShareUrl(fallbackPostUrl)
+        toast.info('Using post link for sharing')
+        return
       }
 
       setShareUrl(`${baseUrl}/share/${finalSlug}`)
