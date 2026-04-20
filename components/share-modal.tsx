@@ -25,7 +25,7 @@ interface ShareModalProps {
   caption?: string
 }
 
-// Keeps fallback responsive while giving the native app time to open.
+// Delays web fallback briefly so the native Instagram app can launch first.
 const APP_LAUNCH_FALLBACK_MS = 1400
 const STORY_SHARE_CTA = 'Rate my OOTD anonymously 👗'
 const hasTouchInterface = () =>
@@ -103,6 +103,8 @@ export function ShareModal({
       if (existingShare?.share_slug) {
         finalSlug = existingShare.share_slug
       } else {
+        let lastInsertError: { code?: string; message?: string } | null = null
+
         for (let attempt = 0; attempt < 3; attempt++) {
           const candidateSlug = makeSlug()
           const { error: insertError } = await supabase.from('shares').insert({
@@ -115,9 +117,15 @@ export function ShareModal({
             break
           }
 
+          lastInsertError = insertError
           if (insertError.code !== '23505') {
             break
           }
+        }
+
+        if (lastInsertError && lastInsertError.code !== '23505') {
+          console.error('Share link insert failed:', lastInsertError)
+          toast.error('Could not create a share link right now')
         }
 
         if (!finalSlug) {
