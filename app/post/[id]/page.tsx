@@ -109,7 +109,10 @@ export default function PostPage() {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
     const postUrl = `${baseUrl}/post/${postId}`
     const displayName = post.users?.username || 'someone'
-    const message = `@${usernamePossessive(displayName)} OOTD is currently rated ${averageRating.toFixed(1)}/5 from ${post.ratings.length} rating${post.ratings.length !== 1 ? 's' : ''}. Rate it here 👗`
+    const message =
+      post.ratings.length > 0
+        ? `@${usernamePossessive(displayName)} OOTD is currently rated ${averageRating.toFixed(1)}/5 from ${post.ratings.length} rating${post.ratings.length !== 1 ? 's' : ''}. Rate it here 👗`
+        : `Be the first to rate @${usernamePossessive(displayName)} OOTD 👗`
 
     try {
       if (navigator.share) {

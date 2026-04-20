@@ -33,7 +33,7 @@ const truncateForShare = (text: string) => {
   const truncated = normalized.slice(0, MAX_SHARED_COMMENT_LENGTH)
   const lastSpaceIndex = truncated.lastIndexOf(' ')
   const safeTruncated =
-    lastSpaceIndex > 0 ? truncated.slice(0, lastSpaceIndex) : truncated
+    lastSpaceIndex > -1 ? truncated.slice(0, lastSpaceIndex) : truncated
 
   return `${safeTruncated}...`
 }
