@@ -54,8 +54,23 @@ export async function POST(request: NextRequest) {
   let bio: string | undefined
   try {
     const body = await request.json()
-    username = typeof body.username === 'string' ? body.username.trim() : undefined
-    bio = typeof body.bio === 'string' ? body.bio.trim() : undefined
+    if (typeof body.username === 'string') {
+      const trimmed = body.username.trim()
+      if (trimmed.length < 1 || trimmed.length > 50) {
+        return NextResponse.json(
+          { error: 'Username must be between 1 and 50 characters' },
+          { status: 400 }
+        )
+      }
+      if (!/^[a-zA-Z0-9_.-]+$/.test(trimmed)) {
+        return NextResponse.json(
+          { error: 'Username may only contain letters, numbers, underscores, hyphens, and dots' },
+          { status: 400 }
+        )
+      }
+      username = trimmed
+    }
+    bio = typeof body.bio === 'string' ? body.bio.trim().slice(0, 500) : undefined
   } catch {
     // Empty or non-JSON body is fine — we use defaults below
   }

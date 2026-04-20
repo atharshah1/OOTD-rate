@@ -27,7 +27,9 @@ BEGIN
       'user_' || left(NEW.id::text, 8)
     )
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    email    = EXCLUDED.email,
+    username = COALESCE(EXCLUDED.username, public.users.username);
   RETURN NEW;
 END;
 $$;
