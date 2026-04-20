@@ -51,7 +51,8 @@ export function ShareRatingForm({ postId, username }: ShareRatingFormProps) {
       }
 
       setSubmitted(true)
-    } catch {
+    } catch (error) {
+      console.error('Rating submission error:', error)
       toast.error('An error occurred')
     } finally {
       setLoading(false)
