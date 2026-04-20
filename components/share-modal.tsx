@@ -185,7 +185,7 @@ export function ShareModal({
   }
 
   const openInNewTab = (url: string) => {
-    if (!shareUrl) return
+    if (!url) return
     const opened = window.open(url, '_blank', 'noopener,noreferrer')
     if (!opened) {
       toast.error('Unable to open share link. Please allow pop-ups and try again.')
