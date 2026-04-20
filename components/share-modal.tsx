@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Loader2, Copy, Check, Share2, ExternalLink } from 'lucide-react'
+import { Loader2, Copy, Check, Share2, ExternalLink, Instagram } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ShareModalProps {
@@ -144,6 +144,50 @@ export function ShareModal({
     }
   }
 
+  const buildStoryClipboardText = () => {
+    const cleanedCaption = caption?.trim()
+    const captionBlock = cleanedCaption ? `${cleanedCaption}\n\n` : ''
+    return `${captionBlock}Rate my OOTD anonymously 👗\n${shareUrl}`
+  }
+
+  const openInstagramStory = async () => {
+    if (!shareUrl) return
+
+    try {
+      await navigator.clipboard.writeText(buildStoryClipboardText())
+    } catch {
+      toast.error('Unable to copy story text automatically')
+    }
+
+    const storyWebUrl = 'https://www.instagram.com/create/story/'
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    if (!isMobile) {
+      openInNewTab(storyWebUrl)
+      toast.success(
+        'Story text copied. Paste it in Instagram Story and add the link/reply sticker.'
+      )
+      return
+    }
+
+    const fallbackTimer = window.setTimeout(() => {
+      window.location.assign(storyWebUrl)
+    }, 1400)
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        window.clearTimeout(fallbackTimer)
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.location.href = 'instagram://story-camera'
+    toast.success(
+      'Opening Instagram Story… text copied, now paste and add the link/reply sticker.'
+    )
+  }
+
   const postToInstagram = async () => {
     if (!mediaUrl) {
       toast.error('No media available to post')
@@ -249,12 +293,23 @@ export function ShareModal({
 
               {/* How to share instructions */}
               <div className="text-xs text-muted-foreground text-center space-y-0.5">
-                <p>Copy this link → go to Instagram Story → tap the link sticker</p>
-                <p className="font-medium text-foreground">Paste the link there 🔗</p>
+                <p>Tap Open Instagram Story to launch the app (or web fallback)</p>
+                <p className="font-medium text-foreground">
+                  Then paste and add the link/reply sticker 🔗
+                </p>
               </div>
 
               {/* Primary CTAs */}
               <div className="space-y-2">
+                <Button
+                  onClick={openInstagramStory}
+                  disabled={!shareUrl}
+                  className="w-full h-11 text-sm font-semibold bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 hover:opacity-90 text-white gap-2"
+                >
+                  <Instagram className="w-4 h-4" />
+                  Open Instagram Story
+                </Button>
+
                 <Button
                   onClick={copyToClipboard}
                   disabled={!shareUrl}
