@@ -77,7 +77,7 @@ export function RatingDialog({
       })
 
       if (error) {
-        if (error.message.toLowerCase().includes('duplicate')) {
+        if (error.code === '23505' || error.message.toLowerCase().includes('duplicate')) {
           toast.error('You have already rated this OOTD')
           return
         }
