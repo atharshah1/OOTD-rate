@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import Image from 'next/image'
+import { Sparkles } from 'lucide-react'
+import { ShareRatingForm } from '@/components/share-rating-form'
 
 interface SharePageProps {
   params: Promise<{ slug: string }>
@@ -54,20 +54,23 @@ export async function generateMetadata(
       ? post.ratings.reduce((sum: number, r: any) => sum + r.rating, 0) /
         post.ratings.length
       : 0
+  const username = (post.users as any)?.username ?? 'someone'
 
   return {
-    title: `${post.users?.username}'s OOTD on OOTD`,
-    description: post.caption || `Check out this outfit rated ${averageRating.toFixed(1)}/5`,
+    title: `Rate @${username}'s OOTD anonymously`,
+    description:
+      post.caption ||
+      `Rate this outfit anonymously! Currently rated ${averageRating.toFixed(1)}/5`,
     openGraph: {
-      title: `${post.users?.username}'s OOTD`,
-      description: post.caption || 'Check out this outfit',
+      title: `Rate @${username}'s OOTD — anonymously 👗`,
+      description: post.caption || 'Tap to rate this outfit anonymously',
       images: firstMedia
         ? [
             {
               url: firstMedia.media_url,
               width: 1200,
               height: 1200,
-              alt: 'OOTD',
+              alt: "OOTD outfit photo",
             },
           ]
         : [],
@@ -75,8 +78,8 @@ export async function generateMetadata(
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${post.users?.username}'s OOTD`,
-      description: post.caption || 'Check out this outfit',
+      title: `Rate @${username}'s OOTD`,
+      description: post.caption || 'Rate this outfit anonymously',
       images: firstMedia ? [firstMedia.media_url] : [],
     },
   }
@@ -94,15 +97,16 @@ export default async function SharePage({ params }: SharePageProps) {
 
   if (!share) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <h1 className="text-3xl font-bold">Share Not Found</h1>
-        <p className="text-muted-foreground">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary via-accent to-secondary flex items-center justify-center">
+          <Sparkles className="w-8 h-8 text-white" />
+        </div>
+        <h1 className="text-2xl font-bold text-center">Link Not Found</h1>
+        <p className="text-muted-foreground text-center text-sm">
           This share link may have expired or been removed.
         </p>
-        <Link href="/">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            Go Home
-          </Button>
+        <Link href="/" className="text-primary hover:underline text-sm">
+          Go to OOTD →
         </Link>
       </div>
     )
@@ -125,115 +129,105 @@ export default async function SharePage({ params }: SharePageProps) {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <h1 className="text-3xl font-bold">Post Not Found</h1>
-        <Link href="/">
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            Go Home
-          </Button>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4">
+        <h1 className="text-2xl font-bold">Post Not Found</h1>
+        <Link href="/" className="text-primary hover:underline text-sm">
+          Go to OOTD →
         </Link>
       </div>
     )
   }
 
   const firstMedia = post.media?.[0]
+  const username = (post.users as any)?.username ?? 'someone'
   const averageRating =
     post.ratings.length > 0
       ? post.ratings.reduce(
           (sum: number, r: { rating: number }) => sum + r.rating,
           0
         ) / post.ratings.length
-      : 0
+      : null
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <Link href="/" className="text-2xl font-bold">
-            OOTD
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Media */}
-          <div className="space-y-4">
-            {firstMedia && (
-              <div className="aspect-square bg-muted rounded-xl overflow-hidden relative">
-                {firstMedia.media_type === 'image' ? (
-                  <Image
-                    src={firstMedia.media_url}
-                    alt="OOTD"
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                ) : (
-                  <video
-                    src={firstMedia.media_url}
-                    controls
-                    className="w-full h-full object-cover"
-                  />
-                )}
-              </div>
-            )}
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-card/50 flex flex-col items-center pb-12">
+      {/* Top logo bar */}
+      <div className="w-full flex justify-center pt-5 pb-2">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary via-accent to-secondary flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
+          <span className="text-base font-bold tracking-tight">OOTD</span>
+        </Link>
+      </div>
 
-          {/* Info */}
-          <div className="space-y-6 flex flex-col justify-center">
-            <Card className="p-6 bg-card border-border/50">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">By</p>
-                  <p className="text-2xl font-bold">@{post.users?.username}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(post.created_at).toLocaleDateString()}
+      {/* Main card — mobile-first, max width matches a phone */}
+      <div className="w-full max-w-sm px-4 mt-2">
+        <div className="bg-card border border-border/50 rounded-3xl overflow-hidden shadow-2xl shadow-primary/5">
+
+          {/* Outfit photo with gradient overlay */}
+          {firstMedia && firstMedia.media_type === 'image' ? (
+            <div className="relative aspect-[4/5] w-full">
+              <Image
+                src={firstMedia.media_url}
+                alt="OOTD outfit"
+                fill
+                className="object-cover"
+                priority
+              />
+              {/* gradient scrim so text is readable */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/70" />
+              {/* overlaid author info */}
+              <div className="absolute bottom-4 left-4 right-4">
+                <p className="text-white text-xl font-bold drop-shadow">@{username}</p>
+                <p className="text-white/80 text-sm drop-shadow">
+                  {post.caption || 'Rate my OOTD 👗'}
+                </p>
+                {averageRating !== null && (
+                  <p className="text-white/60 text-xs mt-0.5">
+                    {averageRating.toFixed(1)} ⭐ avg · {post.ratings.length} rating
+                    {post.ratings.length !== 1 ? 's' : ''}
                   </p>
-                </div>
-
-                {post.caption && (
-                  <div className="pt-4 border-t border-border/50">
-                    <p className="text-base">{post.caption}</p>
-                  </div>
                 )}
-
-                <div className="pt-4 border-t border-border/50">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl font-bold">
-                      {averageRating.toFixed(1)}
-                    </span>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Average Rating</p>
-                      <p className="text-xs text-muted-foreground">
-                        {post.ratings.length} rating
-                        {post.ratings.length !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
-            </Card>
+            </div>
+          ) : firstMedia && firstMedia.media_type === 'video' ? (
+            <div className="aspect-[4/5] w-full bg-muted flex items-center justify-center relative">
+              <video
+                src={firstMedia.media_url}
+                className="w-full h-full object-cover"
+                playsInline
+                muted
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
+              <div className="absolute bottom-4 left-4">
+                <p className="text-white text-xl font-bold">@{username}</p>
+              </div>
+            </div>
+          ) : (
+            /* No media fallback */
+            <div className="aspect-[4/5] w-full bg-gradient-to-br from-primary/20 via-accent/20 to-secondary/20 flex flex-col items-center justify-center gap-2">
+              <Sparkles className="w-12 h-12 text-primary/50" />
+              <p className="text-lg font-bold">@{username}</p>
+            </div>
+          )}
 
-            <Link href={`/post/${post.id}`}>
-              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-base h-12">
-                View Full Post & Rate
-              </Button>
-            </Link>
-
-            <Link href="/">
-              <Button
-                variant="outline"
-                className="w-full border-border text-base h-12"
-              >
-                Back to Home
-              </Button>
-            </Link>
+          {/* Rating form */}
+          <div className="px-5 pb-6 pt-5 space-y-2">
+            <h2 className="text-center text-base font-semibold text-foreground">
+              Rate anonymously 👀
+            </h2>
+            <ShareRatingForm postId={post.id} username={username} />
           </div>
         </div>
-      </main>
+
+        {/* Powered by footer */}
+        <p className="text-center text-xs text-muted-foreground mt-5">
+          Share your own OOTD at{' '}
+          <Link href="/auth/signup" className="text-primary hover:underline">
+            ootd.app
+          </Link>
+        </p>
+      </div>
     </div>
   )
 }

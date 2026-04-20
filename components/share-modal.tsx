@@ -10,39 +10,66 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Loader2, Copy, Check } from 'lucide-react'
+import { Loader2, Copy, Check, Share2, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ShareModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   postId: string
+  /** Username of the post owner */
+  username?: string
+  /** First media item for direct Instagram posting */
+  mediaUrl?: string
+  mediaType?: string
+  caption?: string
 }
 
 export function ShareModal({
   open,
   onOpenChange,
   postId,
+  username = 'you',
+  mediaUrl,
+  mediaType,
+  caption,
 }: ShareModalProps) {
   const [shareUrl, setShareUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [hasInstagramToken, setHasInstagramToken] = useState(false)
+  const [igPosting, setIgPosting] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
-    if (open && !shareUrl) {
-      generateShareLink()
+    if (open) {
+      if (!shareUrl) generateShareLink()
+      checkInstagramConnection()
     }
-  }, [open, supabase, postId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, postId])
+
+  const checkInstagramConnection = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data } = await supabase
+      .from('user_oauth_tokens')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('provider', 'instagram')
+      .maybeSingle()
+
+    setHasInstagramToken(!!data)
+  }
 
   const generateShareLink = async () => {
     setLoading(true)
     try {
-      // Generate a unique slug
       const slug = `${postId.slice(0, 8)}-${Math.random().toString(36).substr(2, 9)}`
 
-      // Create or get share record
       const { data: existingShare } = await supabase
         .from('shares')
         .select('share_slug')
@@ -66,8 +93,7 @@ export function ShareModal({
       }
 
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-      const url = `${baseUrl}/share/${finalSlug}`
-      setShareUrl(url)
+      setShareUrl(`${baseUrl}/share/${finalSlug}`)
     } catch (error) {
       console.error('Error:', error)
       toast.error('Failed to generate share link')
@@ -80,92 +106,221 @@ export function ShareModal({
     navigator.clipboard.writeText(shareUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-    toast.success('Link copied!')
+    toast.success('Link copied! Paste it as a link sticker on your Story 📲')
   }
 
-  const shareToInstagram = () => {
-    // Instagram share via WhatsApp or direct message suggestion
-    const text = `Check out my OOTD! Rate it: ${shareUrl}`
-    const encodedText = encodeURIComponent(text)
-    window.open(`https://wa.me/?text=${encodedText}`, '_blank')
+  const postToInstagram = async () => {
+    if (!mediaUrl) {
+      toast.error('No media available to post')
+      return
+    }
+
+    setIgPosting(true)
+    try {
+      // Videos are posted as Instagram Reels; images go to the Feed
+      const endpoint =
+        mediaType === 'video' ? '/api/instagram/reel' : '/api/instagram/post'
+      const body =
+        mediaType === 'video'
+          ? { postId, videoUrl: mediaUrl, caption }
+          : { postId, mediaUrl, caption }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) {
+        toast.error(json.error ?? 'Failed to post to Instagram')
+      } else {
+        toast.success('Posted to Instagram! 🎉')
+        onOpenChange(false)
+      }
+    } catch {
+      toast.error('An error occurred while posting to Instagram')
+    } finally {
+      setIgPosting(false)
+    }
+  }
+
+  const shareNative = () => {
+    if (!shareUrl) return
+    if (navigator.share) {
+      navigator
+        .share({
+          title: `Rate @${username}'s OOTD`,
+          text: 'Rate my outfit anonymously 👗',
+          url: shareUrl,
+        })
+        .catch(() => {
+          // User cancelled — no-op
+        })
+    } else {
+      copyToClipboard()
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-md">
+      <DialogContent className="bg-card border-border sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Share Your OOTD</DialogTitle>
+          <DialogTitle>Share to Stories 📲</DialogTitle>
           <DialogDescription>
-            Share this link on Instagram stories or with friends
+            Get anonymous ratings from your followers — just like NGL
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-5 py-2">
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           ) : (
             <>
-              {/* Share Link */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Share Link</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={shareUrl}
-                    readOnly
-                    className="bg-input border-border text-sm"
-                  />
-                  <Button
-                    onClick={copyToClipboard}
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground flex-shrink-0"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </Button>
+              {/* Story Card Preview — simulates how it looks as an Instagram link sticker */}
+              <div className="rounded-2xl overflow-hidden border border-border/50 shadow-lg">
+                {/* Card "screen" */}
+                <div className="bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 px-5 py-6 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent mx-auto flex items-center justify-center text-white text-lg font-bold">
+                    {username[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-bold text-base">@{username}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Rate my OOTD anonymously 👗
+                    </p>
+                  </div>
+                  <div className="pt-1 px-4 py-2 rounded-xl bg-background/60 text-xs text-muted-foreground truncate">
+                    {shareUrl || 'generating link…'}
+                  </div>
+                </div>
+                {/* Card footer */}
+                <div className="bg-card px-4 py-2 flex items-center justify-between border-t border-border/30">
+                  <span className="text-xs text-muted-foreground">Tap to rate ✨</span>
+                  <span className="text-xs font-semibold text-primary">OOTD</span>
                 </div>
               </div>
 
-              {/* Share Buttons */}
-              <div className="space-y-2 pt-2">
-                <p className="text-sm font-medium">Quick Share</p>
-                <div className="space-y-2">
+              {/* How to share instructions */}
+              <div className="text-xs text-muted-foreground text-center space-y-0.5">
+                <p>Copy this link → go to Instagram Story → tap the link sticker</p>
+                <p className="font-medium text-foreground">Paste the link there 🔗</p>
+              </div>
+
+              {/* Primary CTAs */}
+              <div className="space-y-2">
+                <Button
+                  onClick={copyToClipboard}
+                  disabled={!shareUrl}
+                  className="w-full h-11 text-sm font-semibold bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy Link for Stories
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={shareNative}
+                  disabled={!shareUrl}
+                  variant="outline"
+                  className="w-full border-border gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share via…
+                </Button>
+              </div>
+
+              {/* Direct Instagram posting (if authenticated) */}
+              {hasInstagramToken && mediaUrl && (
+                <div className="space-y-2 pt-1 border-t border-border/30">
+                  <p className="text-xs font-medium text-muted-foreground text-center">
+                    Or post directly to Instagram
+                  </p>
                   <Button
-                    onClick={shareToInstagram}
+                    onClick={postToInstagram}
+                    disabled={igPosting}
                     className="w-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 hover:opacity-90 text-white"
                   >
-                    Share to Instagram (via WhatsApp)
+                    {igPosting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Posting…
+                      </>
+                    ) : mediaType === 'video' ? (
+                      'Post as Instagram Reel'
+                    ) : (
+                      'Post to Instagram Feed'
+                    )}
                   </Button>
+                </div>
+              )}
+
+              {/* More sharing options (collapsed secondary) */}
+              <details className="group">
+                <summary className="text-xs text-muted-foreground text-center cursor-pointer hover:text-foreground transition-colors">
+                  More sharing options ↓
+                </summary>
+                <div className="space-y-2 pt-3">
                   <Button
                     onClick={() => {
-                      const text = `Check out my OOTD! ${shareUrl}`
-                      const encodedText = encodeURIComponent(text)
-                      window.open(`https://twitter.com/intent/tweet?text=${encodedText}`, '_blank')
+                      const text = encodeURIComponent(
+                        `Rate my OOTD anonymously 👗 ${shareUrl}`
+                      )
+                      window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank')
                     }}
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white text-sm"
                   >
+                    <ExternalLink className="w-4 h-4 mr-2" />
                     Share on Twitter/X
                   </Button>
                   <Button
                     onClick={() => {
-                      const text = `Check out my OOTD! ${shareUrl}`
-                      const encodedText = encodeURIComponent(text)
-                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank')
+                      window.open(
+                        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+                        '_blank'
+                      )
                     }}
-                    className="w-full bg-blue-700 hover:bg-blue-800 text-white"
+                    className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm"
                   >
+                    <ExternalLink className="w-4 h-4 mr-2" />
                     Share on Facebook
                   </Button>
+                  <Button
+                    onClick={() => {
+                      const text = encodeURIComponent(
+                        `Rate my OOTD anonymously 👗 ${shareUrl}`
+                      )
+                      window.open(`https://wa.me/?text=${text}`, '_blank')
+                    }}
+                    variant="outline"
+                    className="w-full border-border text-sm"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Share via WhatsApp
+                  </Button>
                 </div>
-              </div>
+              </details>
 
-              <p className="text-xs text-muted-foreground text-center pt-2">
-                Anyone with this link can view and rate your OOTD
-              </p>
+              {/* Connect Instagram prompt */}
+              {!hasInstagramToken && (
+                <p className="text-xs text-muted-foreground text-center">
+                  <a href="/auth/signin" className="text-primary hover:underline">
+                    Connect Instagram
+                  </a>{' '}
+                  to post directly to your feed or Reels.
+                </p>
+              )}
             </>
           )}
         </div>
