@@ -18,14 +18,20 @@ export function StoryCardActions({ shareUrl, username }: StoryCardActionsProps) 
       ? `${window.location.origin}${shareUrl}`
       : shareUrl
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(absoluteUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast.success('Link copied! Paste it as a link sticker on your Story.')
+  const copyLink = async () => {
+    if (!absoluteUrl) return
+    try {
+      await navigator.clipboard.writeText(absoluteUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success('Link copied! Paste it as a link sticker on your Story.')
+    } catch {
+      toast.error('Unable to copy link. Please copy it manually.')
+    }
   }
 
   const shareNative = () => {
+    if (!absoluteUrl) return
     if (navigator.share) {
       navigator
         .share({

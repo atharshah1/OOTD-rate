@@ -61,6 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_media_post_id ON media(post_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_post_id ON ratings(post_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_user_id ON ratings(user_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_created_at ON ratings(created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_unique_user_per_post
+  ON ratings(post_id, user_id)
+  WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_shares_post_id ON shares(post_id);
 CREATE INDEX IF NOT EXISTS idx_shares_slug ON shares(share_slug);
 
@@ -97,10 +100,35 @@ CREATE POLICY "Anyone can view ratings for public posts" ON ratings FOR SELECT
       SELECT 1 FROM posts WHERE posts.id = ratings.post_id AND posts.visibility = 'public'
     )
   );
-CREATE POLICY "Users can create ratings" ON ratings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can create ratings" ON ratings FOR INSERT
+  WITH CHECK (
+    (
+      auth.uid() IS NULL
+      AND user_id IS NULL
+    )
+    OR (
+      auth.uid() IS NOT NULL
+      AND user_id = auth.uid()
+      AND NOT EXISTS (
+        SELECT 1
+        FROM posts
+        WHERE posts.id = ratings.post_id
+          AND posts.user_id = auth.uid()
+      )
+    )
+  );
 
 -- RLS Policies for shares
 CREATE POLICY "Anyone can view shares" ON shares FOR SELECT USING (true);
+CREATE POLICY "Post owners can create share links" ON shares FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM posts
+      WHERE posts.id = shares.post_id
+        AND posts.user_id = auth.uid()
+    )
+  );
 
 -- Trigger to update user's updated_at
 CREATE OR REPLACE FUNCTION update_user_timestamp()

@@ -37,15 +37,48 @@ export function ShareRatingForm({ postId, username }: ShareRatingFormProps) {
 
     setLoading(true)
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: postData } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .maybeSingle()
+
+        if (postData?.user_id === user.id) {
+          toast.error('You cannot rate your own OOTD')
+          return
+        }
+
+        const { data: existingRating } = await supabase
+          .from('ratings')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (existingRating) {
+          toast.error('You have already rated this OOTD')
+          return
+        }
+      }
+
       const { error } = await supabase.from('ratings').insert({
         post_id: postId,
-        user_id: null,
+        user_id: user?.id ?? null,
         rating,
         comment: comment.trim() || null,
         is_anonymous: true,
       })
 
       if (error) {
+        if (error.code === '23505') {
+          toast.error('You have already rated this OOTD')
+          return
+        }
         toast.error('Failed to send rating. Try again.')
         return
       }

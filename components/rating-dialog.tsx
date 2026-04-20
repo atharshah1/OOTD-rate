@@ -43,15 +43,44 @@ export function RatingDialog({
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
+      if (user) {
+        const { data: postData } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .maybeSingle()
+
+        if (postData?.user_id === user.id) {
+          toast.error('You cannot rate your own OOTD')
+          return
+        }
+
+        const { data: existingRating } = await supabase
+          .from('ratings')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (existingRating) {
+          toast.error('You have already rated this OOTD')
+          return
+        }
+      }
+
       const { error } = await supabase.from('ratings').insert({
         post_id: postId,
-        user_id: isAnonymous ? null : user?.id,
+        user_id: user?.id ?? null,
         rating,
         comment: comment || null,
         is_anonymous: isAnonymous,
       })
 
       if (error) {
+        if (error.code === '23505') {
+          toast.error('You have already rated this OOTD')
+          return
+        }
         toast.error('Failed to submit rating')
       } else {
         toast.success('Rating submitted!')
