@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { put } from '@vercel/blob'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Loader2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Image from 'next/image'
+
+const STORAGE_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || 'media'
 
 export function UploadForm() {
   const [files, setFiles] = useState<File[]>([])
@@ -77,19 +78,38 @@ export function UploadForm() {
 
       // Upload media files
       const uploadedMedia = []
+      const uploadedPaths: string[] = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const fileExt = file.name.split('.').pop()
+        const fileExt = file.name.split('.').pop() || 'bin'
         const fileName = `${user.id}/${post.id}/${Date.now()}-${i}.${fileExt}`
         
         try {
-          const blob = await put(fileName, file, {
-            access: 'public',
-          })
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: false,
+              contentType: file.type,
+            })
+
+          if (uploadError) {
+            throw uploadError
+          }
+
+          uploadedPaths.push(uploadData.path)
+
+          const { data: publicUrlData } = supabase.storage
+            .from(STORAGE_BUCKET)
+            .getPublicUrl(uploadData.path)
+
+          if (!publicUrlData.publicUrl) {
+            throw new Error('No public URL returned from storage')
+          }
 
           uploadedMedia.push({
             post_id: post.id,
-            media_url: blob.url,
+            media_url: publicUrlData.publicUrl,
             media_type: file.type.startsWith('image') ? 'image' : 'video',
             order_index: i,
           })
@@ -100,6 +120,9 @@ export function UploadForm() {
       }
 
       if (uploadedMedia.length === 0) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(STORAGE_BUCKET).remove(uploadedPaths)
+        }
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to upload media')
         return
@@ -111,6 +134,9 @@ export function UploadForm() {
         .insert(uploadedMedia)
 
       if (mediaError) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(STORAGE_BUCKET).remove(uploadedPaths)
+        }
         await supabase.from('posts').delete().eq('id', post.id)
         toast.error('Failed to save media')
         return
