@@ -30,7 +30,6 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
@@ -39,6 +38,40 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (!mounted) return
+
+    const supabase = createClient()
+
+    const fetchPosts = async () => {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            id,
+            user_id,
+            caption,
+            created_at,
+            media_count,
+            users:user_id(username),
+            media(media_url, media_type),
+            ratings(rating)
+          `)
+          .eq('visibility', 'public')
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        if (error) {
+          console.error('Error fetching posts:', error)
+          return
+        }
+
+        setPosts(data || [])
+      } catch (error) {
+        console.error('Error:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
 
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -51,39 +84,7 @@ export default function FeedPage() {
     }
 
     checkAuth()
-  }, [mounted, supabase.auth, router])
-
-  const fetchPosts = async () => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id,
-          user_id,
-          caption,
-          created_at,
-          media_count,
-          users:user_id(username),
-          media(media_url, media_type),
-          ratings(rating)
-        `)
-        .eq('visibility', 'public')
-        .order('created_at', { ascending: false })
-        .limit(20)
-
-      if (error) {
-        console.error('Error fetching posts:', error)
-        return
-      }
-
-      setPosts(data || [])
-    } catch (error) {
-      console.error('Error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [mounted, router])
 
   if (!mounted || loading) {
     return (
