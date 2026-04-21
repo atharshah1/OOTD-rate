@@ -48,10 +48,10 @@ export function StoryCardActions({ shareUrl, username }: StoryCardActionsProps) 
   }
 
   return (
-    <div className="flex gap-2 mt-4">
+    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
       <Button
         onClick={copyLink}
-        className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white gap-2"
+        className="w-full flex-1 gap-2 whitespace-normal bg-gradient-to-r from-primary to-accent text-white hover:opacity-90"
       >
         {copied ? (
           <>
@@ -68,7 +68,7 @@ export function StoryCardActions({ shareUrl, username }: StoryCardActionsProps) 
       <Button
         onClick={shareNative}
         variant="outline"
-        className="flex-1 border-border gap-2"
+        className="w-full flex-1 gap-2 whitespace-normal border-border"
       >
         <Share2 className="w-4 h-4" />
         Share

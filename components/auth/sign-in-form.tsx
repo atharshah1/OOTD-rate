@@ -8,13 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
-import type { Provider } from '@supabase/supabase-js'
 
 export function SignInForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'instagram' | null>(null)
+  const [oauthLoading, setOauthLoading] = useState<'google' | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -45,17 +44,13 @@ export function SignInForm() {
     }
   }
 
-  const handleOAuthSignIn = async (provider: 'google' | 'instagram') => {
-    setOauthLoading(provider)
+  const handleGoogleSignIn = async () => {
+    setOauthLoading('google')
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as Provider,
+        provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-          scopes:
-            provider === 'instagram'
-              ? 'instagram_basic,instagram_content_publish'
-              : undefined,
         },
       })
       if (error) {
@@ -64,7 +59,7 @@ export function SignInForm() {
       }
       // On success the browser is redirected; no need to reset state.
     } catch {
-      toast.error(`Failed to sign in with ${provider}`)
+      toast.error('Failed to sign in with Google')
       setOauthLoading(null)
     }
   }
@@ -79,7 +74,7 @@ export function SignInForm() {
           type="button"
           variant="outline"
           disabled={isDisabled}
-          onClick={() => handleOAuthSignIn('google')}
+          onClick={handleGoogleSignIn}
           className="w-full border-border flex items-center gap-3"
         >
           {oauthLoading === 'google' ? (
@@ -107,35 +102,6 @@ export function SignInForm() {
           Continue with Google
         </Button>
 
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isDisabled}
-          onClick={() => handleOAuthSignIn('instagram')}
-          className="w-full border-border flex items-center gap-3"
-        >
-          {oauthLoading === 'instagram' ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
-              <defs>
-                <linearGradient id="ig-signin-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f09433" />
-                  <stop offset="25%" stopColor="#e6683c" />
-                  <stop offset="50%" stopColor="#dc2743" />
-                  <stop offset="75%" stopColor="#cc2366" />
-                  <stop offset="100%" stopColor="#bc1888" />
-                </linearGradient>
-              </defs>
-              <rect width="24" height="24" rx="5" fill="url(#ig-signin-grad)" />
-              <path
-                fill="white"
-                d="M12 7.2A4.8 4.8 0 1 0 12 16.8 4.8 4.8 0 0 0 12 7.2zm0 7.92A3.12 3.12 0 1 1 12 8.88 3.12 3.12 0 0 1 12 15.12zM17.04 6.96a1.12 1.12 0 1 0 0 2.24 1.12 1.12 0 0 0 0-2.24z"
-              />
-            </svg>
-          )}
-          Continue with Instagram
-        </Button>
       </div>
 
       <div className="relative">
