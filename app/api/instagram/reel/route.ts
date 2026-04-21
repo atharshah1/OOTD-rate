@@ -64,7 +64,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
-  const postMedia = Array.isArray(ownedPost.media) ? ownedPost.media : []
+  const postMedia = ownedPost.media
+    ? Array.isArray(ownedPost.media)
+      ? ownedPost.media
+      : [ownedPost.media]
+    : []
   const ownsRequestedMedia = postMedia.some((item) => item.media_url === videoUrl)
 
   if (!ownsRequestedMedia) {
