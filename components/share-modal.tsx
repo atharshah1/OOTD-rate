@@ -353,6 +353,7 @@ export function ShareModal({
   const [storyCardLoading, setStoryCardLoading] = useState(false)
   const [storyCardSaved, setStoryCardSaved] = useState(false)
   const instagramFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const instagramRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -425,6 +426,9 @@ export function ShareModal({
 
   useEffect(() => {
     return () => {
+      if (instagramRetryTimeoutRef.current !== null) {
+        clearTimeout(instagramRetryTimeoutRef.current)
+      }
       if (instagramFallbackTimeoutRef.current !== null) {
         clearTimeout(instagramFallbackTimeoutRef.current)
       }
@@ -562,6 +566,9 @@ export function ShareModal({
   }
 
   const openInstagramApp = () => {
+    if (instagramRetryTimeoutRef.current !== null) {
+      clearTimeout(instagramRetryTimeoutRef.current)
+    }
     if (instagramFallbackTimeoutRef.current !== null) {
       clearTimeout(instagramFallbackTimeoutRef.current)
     }
@@ -572,7 +579,7 @@ export function ShareModal({
       console.warn('Instagram deep link failed:', error)
     }
 
-    window.setTimeout(() => {
+    instagramRetryTimeoutRef.current = window.setTimeout(() => {
       if (document.visibilityState === 'visible') {
         try {
           launchDeepLink('instagram://app')
@@ -580,6 +587,7 @@ export function ShareModal({
           console.warn('Instagram app deep link retry failed:', error)
         }
       }
+      instagramRetryTimeoutRef.current = null
     }, DEEP_LINK_RETRY_DELAY_MS)
 
     // Only open the website as a fallback if the page is still visible after
