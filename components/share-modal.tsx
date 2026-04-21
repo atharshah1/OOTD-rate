@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -25,12 +25,6 @@ interface ShareModalProps {
   caption?: string
 }
 
-// Delays web fallback briefly so the native Instagram app can launch first.
-const APP_LAUNCH_FALLBACK_MS = 1400
-const STORY_SHARE_CTA = 'Rate my OOTD anonymously 👗'
-const hasTouchInterface = () =>
-  navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches
-
 export function ShareModal({
   open,
   onOpenChange,
@@ -45,7 +39,6 @@ export function ShareModal({
   const [copied, setCopied] = useState(false)
   const [hasInstagramToken, setHasInstagramToken] = useState(false)
   const [igPosting, setIgPosting] = useState(false)
-  const storyLaunchCleanupRef = useRef<(() => void) | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -55,14 +48,6 @@ export function ShareModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, postId])
-
-  useEffect(
-    () => () => {
-      storyLaunchCleanupRef.current?.()
-      storyLaunchCleanupRef.current = null
-    },
-    []
-  )
 
   const checkInstagramConnection = async () => {
     const {
@@ -169,60 +154,24 @@ export function ShareModal({
     }
   }
 
-  const buildStoryClipboardText = () => {
-    const cleanedCaption = caption?.trim()
-    const captionBlock = cleanedCaption ? `${cleanedCaption}\n\n` : ''
-    return `${captionBlock}${STORY_SHARE_CTA}\n${shareUrl}`
-  }
-
   const openInstagramStory = async () => {
-    if (!shareUrl) return
+    const storyLink = shareUrl.trim()
 
-    try {
-      await navigator.clipboard.writeText(buildStoryClipboardText())
-    } catch {
-      toast.error('Unable to copy story text automatically')
-    }
-
-    const storyWebUrl = 'https://www.instagram.com/create/story/'
-
-    if (!hasTouchInterface()) {
-      openInNewTab(storyWebUrl)
-      toast.success(
-        'Story text copied. Paste it in Instagram Story and add the link/reply sticker.'
-      )
+    if (!storyLink) {
+      toast.error('Share link is still generating. Please try again in a moment.')
       return
     }
 
-    storyLaunchCleanupRef.current?.()
-
-    let fallbackTimer: ReturnType<typeof window.setTimeout> | undefined
-
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        cleanup()
-        storyLaunchCleanupRef.current = null
-      }
+    try {
+      await navigator.clipboard.writeText(storyLink)
+    } catch {
+      toast.error('Unable to copy link automatically. Use "Copy Link for Stories".')
     }
 
-    const cleanup = () => {
-      if (fallbackTimer !== undefined) {
-        window.clearTimeout(fallbackTimer)
-      }
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-
-    fallbackTimer = window.setTimeout(() => {
-      cleanup()
-      window.location.assign(storyWebUrl)
-    }, APP_LAUNCH_FALLBACK_MS)
-
-    storyLaunchCleanupRef.current = cleanup
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    // Instagram deep link opens the native Story camera when installed; otherwise fallback timer redirects to web.
-    window.location.href = 'instagram://story-camera'
+    const storyWebUrl = 'https://www.instagram.com/create/story/'
+    openInNewTab(storyWebUrl)
     toast.success(
-      'Opening Instagram Story… text copied, now paste and add the link/reply sticker.'
+      'Opening Instagram Story creator… link copied, paste it into the Link sticker.'
     )
   }
 
@@ -290,7 +239,7 @@ export function ShareModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-sm">
+      <DialogContent className="bg-card border-border sm:max-w-sm max-h-[90svh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share to Stories 📲</DialogTitle>
           <DialogDescription>
@@ -323,9 +272,9 @@ export function ShareModal({
                   </div>
                 </div>
                 {/* Card footer */}
-                <div className="bg-card px-4 py-2 flex items-center justify-between border-t border-border/30">
-                  <span className="text-xs text-muted-foreground">Tap to rate ✨</span>
-                  <span className="text-xs font-semibold text-primary">OOTD</span>
+                <div className="bg-card px-4 py-2 flex items-center justify-between gap-2 border-t border-border/30">
+                  <span className="text-xs text-muted-foreground truncate">Tap to rate ✨</span>
+                  <span className="text-xs font-semibold text-primary shrink-0">OOTD</span>
                 </div>
               </div>
 
