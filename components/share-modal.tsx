@@ -39,6 +39,13 @@ const STORY_CARD_WIDTH = 1080
 const STORY_CARD_HEIGHT = 1920
 const APP_LAUNCH_TIMEOUT_MS = 2200
 const SLUG_SUFFIX_LENGTH = 12
+const STORY_MEDIA_FRAME = {
+  x: 60,
+  y: 240,
+  width: STORY_CARD_WIDTH - 120,
+  height: 1180,
+  radius: 56,
+}
 
 function generateSlugSuffix() {
   if (globalThis.crypto?.randomUUID) {
@@ -204,31 +211,64 @@ async function buildStoryCardImage({
     throw new Error('Canvas is unavailable')
   }
 
-  // Draw background: outfit photo covering the full card, or a gradient fallback
+  const backgroundGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+  backgroundGradient.addColorStop(0, '#ff006e')
+  backgroundGradient.addColorStop(0.5, '#8f00ff')
+  backgroundGradient.addColorStop(1, '#00d9ff')
+  ctx.fillStyle = backgroundGradient
+  ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+
+  // Draw the outfit inside a framed panel so the branded background stays visible.
   if (mediaUrl && mediaType !== 'video') {
     try {
       const mediaImage = await loadImage(mediaUrl)
-      const scale = Math.max(STORY_CARD_WIDTH / mediaImage.width, STORY_CARD_HEIGHT / mediaImage.height)
+      const scale = Math.max(
+        STORY_MEDIA_FRAME.width / mediaImage.width,
+        STORY_MEDIA_FRAME.height / mediaImage.height
+      )
       const drawWidth = mediaImage.width * scale
       const drawHeight = mediaImage.height * scale
-      const drawX = (STORY_CARD_WIDTH - drawWidth) / 2
-      const drawY = (STORY_CARD_HEIGHT - drawHeight) / 2
+      const drawX = STORY_MEDIA_FRAME.x + (STORY_MEDIA_FRAME.width - drawWidth) / 2
+      const drawY = STORY_MEDIA_FRAME.y + (STORY_MEDIA_FRAME.height - drawHeight) / 2
+
+      ctx.save()
+      roundedRectPath(
+        ctx,
+        STORY_MEDIA_FRAME.x,
+        STORY_MEDIA_FRAME.y,
+        STORY_MEDIA_FRAME.width,
+        STORY_MEDIA_FRAME.height,
+        STORY_MEDIA_FRAME.radius
+      )
+      ctx.clip()
       ctx.drawImage(mediaImage, drawX, drawY, drawWidth, drawHeight)
+      ctx.restore()
+
+      ctx.save()
+      roundedRectPath(
+        ctx,
+        STORY_MEDIA_FRAME.x,
+        STORY_MEDIA_FRAME.y,
+        STORY_MEDIA_FRAME.width,
+        STORY_MEDIA_FRAME.height,
+        STORY_MEDIA_FRAME.radius
+      )
+      ctx.lineWidth = 3
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+      ctx.stroke()
+      ctx.restore()
     } catch (error) {
       console.warn('Falling back to a gradient story card background:', error)
-      const fallbackGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
-      fallbackGradient.addColorStop(0, '#2b2b40')
-      fallbackGradient.addColorStop(1, '#111827')
-      ctx.fillStyle = fallbackGradient
-      ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+      ctx.fillStyle = 'rgba(10,10,10,0.28)'
+      fillRoundedRect(
+        ctx,
+        STORY_MEDIA_FRAME.x,
+        STORY_MEDIA_FRAME.y,
+        STORY_MEDIA_FRAME.width,
+        STORY_MEDIA_FRAME.height,
+        STORY_MEDIA_FRAME.radius
+      )
     }
-  } else {
-    const fallbackGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
-    fallbackGradient.addColorStop(0, '#ff006e')
-    fallbackGradient.addColorStop(0.5, '#8f00ff')
-    fallbackGradient.addColorStop(1, '#00d9ff')
-    ctx.fillStyle = fallbackGradient
-    ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
   }
 
   // Top gradient overlay for username readability
