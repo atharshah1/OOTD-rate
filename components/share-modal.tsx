@@ -18,8 +18,6 @@ import {
   Share2,
   ExternalLink,
   Instagram,
-  Images,
-  Link2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -38,7 +36,15 @@ interface ShareModalProps {
 const STORY_CARD_WIDTH = 1080
 const STORY_CARD_HEIGHT = 1920
 const APP_LAUNCH_TIMEOUT_MS = 2200
+const DEEP_LINK_RETRY_DELAY_MS = 250
 const SLUG_SUFFIX_LENGTH = 12
+const STORY_MEDIA_FRAME = {
+  x: 60,
+  y: 240,
+  width: STORY_CARD_WIDTH - 120,
+  height: 1180,
+  radius: 56,
+}
 
 function generateSlugSuffix() {
   if (globalThis.crypto?.randomUUID) {
@@ -172,6 +178,18 @@ function drawWrappedText(
   return y + renderedLines.length * lineHeight
 }
 
+function launchDeepLink(url: string) {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.rel = 'noopener noreferrer'
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+
+  window.location.href = url
+}
+
 async function loadImage(url: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
@@ -204,31 +222,64 @@ async function buildStoryCardImage({
     throw new Error('Canvas is unavailable')
   }
 
-  // Draw background: outfit photo covering the full card, or a gradient fallback
+  const backgroundGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+  backgroundGradient.addColorStop(0, '#ff006e')
+  backgroundGradient.addColorStop(0.5, '#8f00ff')
+  backgroundGradient.addColorStop(1, '#00d9ff')
+  ctx.fillStyle = backgroundGradient
+  ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+
+  // Draw the outfit inside a framed panel so the branded background stays visible.
   if (mediaUrl && mediaType !== 'video') {
     try {
       const mediaImage = await loadImage(mediaUrl)
-      const scale = Math.max(STORY_CARD_WIDTH / mediaImage.width, STORY_CARD_HEIGHT / mediaImage.height)
+      const scale = Math.max(
+        STORY_MEDIA_FRAME.width / mediaImage.width,
+        STORY_MEDIA_FRAME.height / mediaImage.height
+      )
       const drawWidth = mediaImage.width * scale
       const drawHeight = mediaImage.height * scale
-      const drawX = (STORY_CARD_WIDTH - drawWidth) / 2
-      const drawY = (STORY_CARD_HEIGHT - drawHeight) / 2
+      const drawX = STORY_MEDIA_FRAME.x + (STORY_MEDIA_FRAME.width - drawWidth) / 2
+      const drawY = STORY_MEDIA_FRAME.y + (STORY_MEDIA_FRAME.height - drawHeight) / 2
+
+      ctx.save()
+      roundedRectPath(
+        ctx,
+        STORY_MEDIA_FRAME.x,
+        STORY_MEDIA_FRAME.y,
+        STORY_MEDIA_FRAME.width,
+        STORY_MEDIA_FRAME.height,
+        STORY_MEDIA_FRAME.radius
+      )
+      ctx.clip()
       ctx.drawImage(mediaImage, drawX, drawY, drawWidth, drawHeight)
+      ctx.restore()
+
+      ctx.save()
+      roundedRectPath(
+        ctx,
+        STORY_MEDIA_FRAME.x,
+        STORY_MEDIA_FRAME.y,
+        STORY_MEDIA_FRAME.width,
+        STORY_MEDIA_FRAME.height,
+        STORY_MEDIA_FRAME.radius
+      )
+      ctx.lineWidth = 3
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+      ctx.stroke()
+      ctx.restore()
     } catch (error) {
       console.warn('Falling back to a gradient story card background:', error)
-      const fallbackGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
-      fallbackGradient.addColorStop(0, '#2b2b40')
-      fallbackGradient.addColorStop(1, '#111827')
-      ctx.fillStyle = fallbackGradient
-      ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+      ctx.fillStyle = 'rgba(10,10,10,0.28)'
+      fillRoundedRect(
+        ctx,
+        STORY_MEDIA_FRAME.x,
+        STORY_MEDIA_FRAME.y,
+        STORY_MEDIA_FRAME.width,
+        STORY_MEDIA_FRAME.height,
+        STORY_MEDIA_FRAME.radius
+      )
     }
-  } else {
-    const fallbackGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
-    fallbackGradient.addColorStop(0, '#ff006e')
-    fallbackGradient.addColorStop(0.5, '#8f00ff')
-    fallbackGradient.addColorStop(1, '#00d9ff')
-    ctx.fillStyle = fallbackGradient
-    ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
   }
 
   // Top gradient overlay for username readability
@@ -302,6 +353,7 @@ export function ShareModal({
   const [storyCardLoading, setStoryCardLoading] = useState(false)
   const [storyCardSaved, setStoryCardSaved] = useState(false)
   const instagramFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const instagramRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -374,6 +426,9 @@ export function ShareModal({
 
   useEffect(() => {
     return () => {
+      if (instagramRetryTimeoutRef.current !== null) {
+        clearTimeout(instagramRetryTimeoutRef.current)
+      }
       if (instagramFallbackTimeoutRef.current !== null) {
         clearTimeout(instagramFallbackTimeoutRef.current)
       }
@@ -511,18 +566,29 @@ export function ShareModal({
   }
 
   const openInstagramApp = () => {
+    if (instagramRetryTimeoutRef.current !== null) {
+      clearTimeout(instagramRetryTimeoutRef.current)
+    }
     if (instagramFallbackTimeoutRef.current !== null) {
       clearTimeout(instagramFallbackTimeoutRef.current)
     }
 
-    // Use a hidden anchor click to trigger the deep link — more reliable on
-    // iOS Safari and Android Chrome than window.location.assign.
-    const anchor = document.createElement('a')
-    anchor.href = 'instagram://camera'
-    anchor.style.display = 'none'
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
+    try {
+      launchDeepLink('instagram://camera')
+    } catch (error) {
+      console.warn('Instagram deep link failed:', error)
+    }
+
+    instagramRetryTimeoutRef.current = window.setTimeout(() => {
+      if (document.visibilityState === 'visible') {
+        try {
+          launchDeepLink('instagram://app')
+        } catch (error) {
+          console.warn('Instagram app deep link retry failed:', error)
+        }
+      }
+      instagramRetryTimeoutRef.current = null
+    }, DEEP_LINK_RETRY_DELAY_MS)
 
     // Only open the website as a fallback if the page is still visible after
     // giving the OS enough time to hand off to the app (APP_LAUNCH_TIMEOUT_MS).
@@ -547,14 +613,15 @@ export function ShareModal({
       return
     }
 
-    const copiedLink = await copyToClipboard({ quiet: true })
+    const copiedLinkPromise = copyToClipboard({ quiet: true })
     const savedStoryCard = downloadStoryCard({ quiet: true })
+    openInstagramApp()
+    const copiedLink = await copiedLinkPromise
 
     if (!copiedLink) {
       toast.error('Unable to copy the link automatically. Please use "Copy Link for Stories".')
     }
 
-    openInstagramApp()
     toast.success(
       savedStoryCard
         ? 'Saved your full story card and opened Instagram. Create a Story, pick the saved image from your gallery, then paste the link sticker.'
@@ -629,9 +696,7 @@ export function ShareModal({
       <DialogContent className="border-border bg-card max-h-[90svh] overflow-y-auto p-4 sm:max-w-md sm:p-6">
         <DialogHeader>
           <DialogTitle>Share to Instagram Story 📲</DialogTitle>
-          <DialogDescription>
-            Save the ready-made story image, open Instagram, then paste your link sticker.
-          </DialogDescription>
+          <DialogDescription>Download the story image and open Instagram directly.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
@@ -645,9 +710,6 @@ export function ShareModal({
                 <div className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Full story image</p>
-                    <p className="text-xs text-muted-foreground">
-                      This is the saved background image users should pick from gallery.
-                    </p>
                   </div>
                   <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold text-primary">
                     {storyCardSaved ? 'Saved' : 'Ready'}
@@ -668,33 +730,6 @@ export function ShareModal({
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-2xl border border-border/50 bg-background/50 p-4">
-                <p className="text-sm font-semibold text-foreground">Follow the same 4 steps shown on the card</p>
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Download className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Save the full story image first so your background and instructions stay together.</p>
-                  </div>
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Instagram className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>
-                      Open Instagram. If it does not land on Story automatically, tap the{' '}
-                      <span className="font-medium text-foreground">plus button</span> and
-                      choose the <span className="font-medium text-foreground">Story</span>{' '}
-                      option.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Images className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Pick the saved image from your gallery or downloads so followers see the full background.</p>
-                  </div>
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Paste the copied link into Instagram's Link sticker, then post your Story.</p>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Button
                   onClick={openInstagramStory}
@@ -702,7 +737,7 @@ export function ShareModal({
                   className="h-auto min-h-11 w-full gap-2 whitespace-normal bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 py-3 text-sm font-semibold text-white hover:opacity-90"
                 >
                   <Instagram className="w-4 h-4" />
-                  Save card &amp; open Instagram
+                  Download card &amp; open Instagram
                 </Button>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
