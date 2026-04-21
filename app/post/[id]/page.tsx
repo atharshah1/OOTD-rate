@@ -36,6 +36,7 @@ export default function PostPage() {
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [showRatingDialog, setShowRatingDialog] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
@@ -48,11 +49,15 @@ export default function PostPage() {
   }, [postId, supabase])
 
   const fetchCurrentUser = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-    setCurrentUserId(user?.id ?? null)
+      setCurrentUserId(user?.id ?? null)
+    } finally {
+      setAuthChecked(true)
+    }
   }
 
   const fetchPost = async () => {
@@ -87,7 +92,7 @@ export default function PostPage() {
     }
   }
 
-  if (loading) {
+  if (loading || !authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
