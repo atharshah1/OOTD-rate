@@ -353,7 +353,7 @@ export function ShareModal({
   const [storyCardUrl, setStoryCardUrl] = useState('')
   const [storyCardLoading, setStoryCardLoading] = useState(false)
   const [storyCardSaved, setStoryCardSaved] = useState(false)
-  const instagramFallbackTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const instagramFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
