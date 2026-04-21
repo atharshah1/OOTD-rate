@@ -18,8 +18,6 @@ import {
   Share2,
   ExternalLink,
   Instagram,
-  Images,
-  Link2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -177,6 +175,18 @@ function drawWrappedText(
   })
 
   return y + renderedLines.length * lineHeight
+}
+
+function launchDeepLink(url: string) {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.rel = 'noopener noreferrer'
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+
+  window.location.href = url
 }
 
 async function loadImage(url: string) {
@@ -555,14 +565,21 @@ export function ShareModal({
       clearTimeout(instagramFallbackTimeoutRef.current)
     }
 
-    // Use a hidden anchor click to trigger the deep link — more reliable on
-    // iOS Safari and Android Chrome than window.location.assign.
-    const anchor = document.createElement('a')
-    anchor.href = 'instagram://camera'
-    anchor.style.display = 'none'
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
+    try {
+      launchDeepLink('instagram://camera')
+    } catch (error) {
+      console.warn('Instagram deep link failed:', error)
+    }
+
+    window.setTimeout(() => {
+      if (document.visibilityState === 'visible') {
+        try {
+          launchDeepLink('instagram://app')
+        } catch (error) {
+          console.warn('Instagram app deep link retry failed:', error)
+        }
+      }
+    }, 250)
 
     // Only open the website as a fallback if the page is still visible after
     // giving the OS enough time to hand off to the app (APP_LAUNCH_TIMEOUT_MS).
@@ -587,14 +604,14 @@ export function ShareModal({
       return
     }
 
-    const copiedLink = await copyToClipboard({ quiet: true })
     const savedStoryCard = downloadStoryCard({ quiet: true })
+    openInstagramApp()
+    const copiedLink = await copyToClipboard({ quiet: true })
 
     if (!copiedLink) {
       toast.error('Unable to copy the link automatically. Please use "Copy Link for Stories".')
     }
 
-    openInstagramApp()
     toast.success(
       savedStoryCard
         ? 'Saved your full story card and opened Instagram. Create a Story, pick the saved image from your gallery, then paste the link sticker.'
@@ -669,9 +686,7 @@ export function ShareModal({
       <DialogContent className="border-border bg-card max-h-[90svh] overflow-y-auto p-4 sm:max-w-md sm:p-6">
         <DialogHeader>
           <DialogTitle>Share to Instagram Story 📲</DialogTitle>
-          <DialogDescription>
-            Save the ready-made story image, open Instagram, then paste your link sticker.
-          </DialogDescription>
+          <DialogDescription>Download the story image and jump straight into Instagram.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
@@ -685,9 +700,6 @@ export function ShareModal({
                 <div className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Full story image</p>
-                    <p className="text-xs text-muted-foreground">
-                      This is the saved background image users should pick from gallery.
-                    </p>
                   </div>
                   <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold text-primary">
                     {storyCardSaved ? 'Saved' : 'Ready'}
@@ -708,33 +720,6 @@ export function ShareModal({
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-2xl border border-border/50 bg-background/50 p-4">
-                <p className="text-sm font-semibold text-foreground">Follow the same 4 steps shown on the card</p>
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Download className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Save the full story image first so your background and instructions stay together.</p>
-                  </div>
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Instagram className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>
-                      Open Instagram. If it does not land on Story automatically, tap the{' '}
-                      <span className="font-medium text-foreground">plus button</span> and
-                      choose the <span className="font-medium text-foreground">Story</span>{' '}
-                      option.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Images className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Pick the saved image from your gallery or downloads so followers see the full background.</p>
-                  </div>
-                  <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
-                    <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Paste the copied link into Instagram's Link sticker, then post your Story.</p>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Button
                   onClick={openInstagramStory}
@@ -742,7 +727,7 @@ export function ShareModal({
                   className="h-auto min-h-11 w-full gap-2 whitespace-normal bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-500 py-3 text-sm font-semibold text-white hover:opacity-90"
                 >
                   <Instagram className="w-4 h-4" />
-                  Save card &amp; open Instagram
+                  Download card &amp; open Instagram
                 </Button>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
