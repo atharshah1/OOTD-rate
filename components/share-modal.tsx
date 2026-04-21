@@ -605,9 +605,10 @@ export function ShareModal({
       return
     }
 
+    const copiedLinkPromise = copyToClipboard({ quiet: true })
     const savedStoryCard = downloadStoryCard({ quiet: true })
     openInstagramApp()
-    const copiedLink = await copyToClipboard({ quiet: true })
+    const copiedLink = await copiedLinkPromise
 
     if (!copiedLink) {
       toast.error('Unable to copy the link automatically. Please use "Copy Link for Stories".')
@@ -687,7 +688,7 @@ export function ShareModal({
       <DialogContent className="border-border bg-card max-h-[90svh] overflow-y-auto p-4 sm:max-w-md sm:p-6">
         <DialogHeader>
           <DialogTitle>Share to Instagram Story 📲</DialogTitle>
-          <DialogDescription>Download the story image and jump straight into Instagram.</DialogDescription>
+          <DialogDescription>Download the story image and open Instagram directly.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
