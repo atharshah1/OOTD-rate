@@ -32,6 +32,7 @@ interface Post {
   }
   media: Array<{
     media_url: string
+    media_type: string
   }>
   ratings: Array<{
     rating: number
@@ -130,7 +131,7 @@ export default function ProfilePage() {
           caption,
           created_at,
           users:user_id(username),
-          media(media_url),
+          media(media_url, media_type),
           ratings(rating)
         `)
         .eq('user_id', userId)
@@ -443,6 +444,7 @@ export default function ProfilePage() {
                     key={post.id}
                     id={post.id}
                     mediaUrl={post.media?.[0]?.media_url || '/placeholder.jpg'}
+                    mediaType={post.media?.[0]?.media_type}
                     caption={post.caption}
                     username={post.users?.username || 'Anonymous'}
                     ratingCount={post.ratings.length}
@@ -453,6 +455,7 @@ export default function ProfilePage() {
                         : 0
                     }
                     commentCount={0}
+                    isOwner
                   />
                 ))}
               </div>
@@ -631,4 +634,3 @@ function InboxCard({
     </Card>
   )
 }
-

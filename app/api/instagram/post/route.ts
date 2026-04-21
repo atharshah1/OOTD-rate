@@ -52,6 +52,27 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const { data: ownedPost, error: postError } = await supabase
+    .from('posts')
+    .select('id, media(media_url)')
+    .eq('id', postId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (postError || !ownedPost) {
+    return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+  }
+
+  const postMedia = Array.isArray(ownedPost.media) ? ownedPost.media : []
+  const ownsRequestedMedia = postMedia.some((item) => item.media_url === mediaUrl)
+
+  if (!ownsRequestedMedia) {
+    return NextResponse.json(
+      { error: 'Media does not belong to this post' },
+      { status: 400 }
+    )
+  }
+
   // Fetch the stored Instagram access token for this user
   const { data: tokenRecord, error: tokenError } = await supabase
     .from('user_oauth_tokens')
