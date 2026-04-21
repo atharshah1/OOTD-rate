@@ -37,6 +37,22 @@ interface ShareModalProps {
 
 const STORY_CARD_WIDTH = 1080
 const STORY_CARD_HEIGHT = 1920
+const APP_LAUNCH_CHECK_DELAY_MS = 1400
+const APP_LAUNCH_TIMEOUT_MS = 2200
+
+function generateSlugSuffix() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
+  }
+
+  if (globalThis.crypto?.getRandomValues) {
+    const buffer = new Uint8Array(9)
+    globalThis.crypto.getRandomValues(buffer)
+    return Array.from(buffer, (value) => (value % 36).toString(36)).join('')
+  }
+
+  throw new Error('Secure random values are unavailable in this browser')
+}
 
 function ellipsize(text: string, maxLength: number) {
   if (text.length <= maxLength) return text
@@ -140,7 +156,7 @@ function drawWrappedText(
 }
 
 async function loadImage(url: string) {
-  return await new Promise<HTMLImageElement>((resolve, reject) => {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
     image.crossOrigin = 'anonymous'
     image.onload = () => resolve(image)
@@ -288,7 +304,7 @@ async function buildStoryCardImage({
   ctx.font = '700 28px sans-serif'
   ctx.fillText(getShareLabel(shareUrl), 180, 1811)
 
-  return await new Promise<Blob>((resolve, reject) => {
+  return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {
         resolve(blob)
@@ -409,10 +425,7 @@ export function ShareModal({
 
     try {
       const makeSlug = () => {
-        const randomSuffix = globalThis.crypto?.randomUUID
-          ? globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
-          : Math.random().toString(36).slice(2, 11).padEnd(9, '0')
-        return `${postId.slice(0, 8)}-${randomSuffix}`
+        return `${postId.slice(0, 8)}-${generateSlugSuffix()}`
       }
 
       const { data: existingShare } = await supabase
@@ -525,10 +538,13 @@ export function ShareModal({
     window.location.assign('instagram://camera')
 
     window.setTimeout(() => {
-      if (document.visibilityState === 'visible' && Date.now() - startedAt < 2200) {
+      if (
+        document.visibilityState === 'visible' &&
+        Date.now() - startedAt < APP_LAUNCH_TIMEOUT_MS
+      ) {
         openInNewTab('https://www.instagram.com/')
       }
-    }, 1400)
+    }, APP_LAUNCH_CHECK_DELAY_MS)
   }
 
   const openInstagramStory = async () => {
