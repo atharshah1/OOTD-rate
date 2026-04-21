@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -43,7 +43,7 @@ const SLUG_SUFFIX_LENGTH = 12
 
 function generateSlugSuffix() {
   if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, SLUG_SUFFIX_LENGTH)
+    return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, SLUG_SUFFIX_LENGTH)
   }
 
   if (globalThis.crypto?.getRandomValues) {
@@ -117,6 +117,7 @@ function drawWrappedText(
   const words = text.trim().split(/\s+/)
   const lines: string[] = []
   let currentLine = ''
+  let truncated = false
 
   for (const word of words) {
     if (!currentLine && ctx.measureText(word).width > maxWidth) {
@@ -125,6 +126,7 @@ function drawWrappedText(
         shortenedWord = shortenedWord.slice(0, -1)
       }
       lines.push(`${shortenedWord}…`)
+      truncated = true
       continue
     }
 
@@ -140,6 +142,7 @@ function drawWrappedText(
     currentLine = word
 
     if (lines.length === maxLines - 1) {
+      truncated = true
       break
     }
   }
@@ -149,15 +152,18 @@ function drawWrappedText(
   }
 
   const renderedLines = lines.slice(0, maxLines).map((line, index, array) => {
-    if (index !== array.length - 1 || words.join(' ') === lines.join(' ')) {
+    if (index !== array.length - 1 || !truncated) {
       return line
     }
 
-    let truncated = line
-    while (ctx.measureText(`${truncated}…`).width > maxWidth && truncated.length > 0) {
-      truncated = truncated.slice(0, -1)
+    let truncatedLine = line
+    while (
+      ctx.measureText(`${truncatedLine}…`).width > maxWidth &&
+      truncatedLine.length > 0
+    ) {
+      truncatedLine = truncatedLine.slice(0, -1)
     }
-    return `${truncated}…`
+    return `${truncatedLine}…`
   })
 
   renderedLines.forEach((line, index) => {
@@ -256,7 +262,8 @@ async function buildStoryCardImage({
       ctx.clip()
       ctx.drawImage(mediaImage, drawX, drawY, drawWidth, drawHeight)
       ctx.restore()
-    } catch {
+    } catch (error) {
+      console.warn('Falling back to a gradient story card background:', error)
       const fallbackGradient = ctx.createLinearGradient(imageX, imageY, imageX + imageWidth, imageY + imageHeight)
       fallbackGradient.addColorStop(0, '#2b2b40')
       fallbackGradient.addColorStop(1, '#111827')
@@ -346,6 +353,7 @@ export function ShareModal({
   const [storyCardUrl, setStoryCardUrl] = useState('')
   const [storyCardLoading, setStoryCardLoading] = useState(false)
   const [storyCardSaved, setStoryCardSaved] = useState(false)
+  const instagramFallbackTimeoutRef = useRef<number | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -415,6 +423,14 @@ export function ShareModal({
       setStoryCardSaved(false)
     }
   }, [open])
+
+  useEffect(() => {
+    return () => {
+      if (instagramFallbackTimeoutRef.current !== null) {
+        window.clearTimeout(instagramFallbackTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const checkInstagramConnection = async () => {
     const {
@@ -549,15 +565,20 @@ export function ShareModal({
   const openInstagramApp = () => {
     const startedAt = Date.now()
 
+    if (instagramFallbackTimeoutRef.current !== null) {
+      window.clearTimeout(instagramFallbackTimeoutRef.current)
+    }
+
     window.location.assign('instagram://camera')
 
-    window.setTimeout(() => {
+    instagramFallbackTimeoutRef.current = window.setTimeout(() => {
       if (
         document.visibilityState === 'visible' &&
         Date.now() - startedAt < APP_LAUNCH_TIMEOUT_MS
       ) {
         openInNewTab('https://www.instagram.com/')
       }
+      instagramFallbackTimeoutRef.current = null
     }, APP_LAUNCH_CHECK_DELAY_MS)
   }
 
