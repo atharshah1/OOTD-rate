@@ -49,7 +49,7 @@ function generateSlugSuffix() {
   if (globalThis.crypto?.getRandomValues) {
     const buffer = new Uint8Array(SLUG_SUFFIX_LENGTH)
     globalThis.crypto.getRandomValues(buffer)
-    return Array.from(buffer, (value) => (value % 36).toString(36)).join('')
+    return Array.from(buffer, (value) => value.toString(16).padStart(2, '0')).join('').slice(0, SLUG_SUFFIX_LENGTH)
   }
 
   throw new Error(
@@ -353,7 +353,7 @@ export function ShareModal({
   const [storyCardUrl, setStoryCardUrl] = useState('')
   const [storyCardLoading, setStoryCardLoading] = useState(false)
   const [storyCardSaved, setStoryCardSaved] = useState(false)
-  const instagramFallbackTimeoutRef = useRef<number | null>(null)
+  const instagramFallbackTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -563,8 +563,6 @@ export function ShareModal({
   }
 
   const openInstagramApp = () => {
-    const startedAt = Date.now()
-
     if (instagramFallbackTimeoutRef.current !== null) {
       window.clearTimeout(instagramFallbackTimeoutRef.current)
     }
@@ -572,14 +570,11 @@ export function ShareModal({
     window.location.assign('instagram://camera')
 
     instagramFallbackTimeoutRef.current = window.setTimeout(() => {
-      if (
-        document.visibilityState === 'visible' &&
-        Date.now() - startedAt < APP_LAUNCH_TIMEOUT_MS
-      ) {
+      if (document.visibilityState === 'visible') {
         openInNewTab('https://www.instagram.com/')
       }
       instagramFallbackTimeoutRef.current = null
-    }, APP_LAUNCH_CHECK_DELAY_MS)
+    }, Math.min(APP_LAUNCH_CHECK_DELAY_MS, APP_LAUNCH_TIMEOUT_MS))
   }
 
   const openInstagramStory = async () => {
