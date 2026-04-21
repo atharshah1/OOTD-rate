@@ -234,7 +234,7 @@ export function ShareModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-sm">
+      <DialogContent className="bg-card border-border sm:max-w-sm max-h-[90svh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Share to Stories 📲</DialogTitle>
           <DialogDescription>
@@ -267,9 +267,9 @@ export function ShareModal({
                   </div>
                 </div>
                 {/* Card footer */}
-                <div className="bg-card px-4 py-2 flex items-center justify-between border-t border-border/30">
-                  <span className="text-xs text-muted-foreground">Tap to rate ✨</span>
-                  <span className="text-xs font-semibold text-primary">OOTD</span>
+                <div className="bg-card px-4 py-2 flex items-center justify-between gap-2 border-t border-border/30">
+                  <span className="text-xs text-muted-foreground truncate">Tap to rate ✨</span>
+                  <span className="text-xs font-semibold text-primary shrink-0">OOTD</span>
                 </div>
               </div>
 
