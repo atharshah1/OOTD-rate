@@ -39,19 +39,22 @@ const STORY_CARD_WIDTH = 1080
 const STORY_CARD_HEIGHT = 1920
 const APP_LAUNCH_CHECK_DELAY_MS = 1400
 const APP_LAUNCH_TIMEOUT_MS = 2200
+const SLUG_SUFFIX_LENGTH = 12
 
 function generateSlugSuffix() {
   if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, 9)
+    return globalThis.crypto.randomUUID().replaceAll('-', '').slice(0, SLUG_SUFFIX_LENGTH)
   }
 
   if (globalThis.crypto?.getRandomValues) {
-    const buffer = new Uint8Array(9)
+    const buffer = new Uint8Array(SLUG_SUFFIX_LENGTH)
     globalThis.crypto.getRandomValues(buffer)
     return Array.from(buffer, (value) => (value % 36).toString(36)).join('')
   }
 
-  throw new Error('Secure random values are unavailable in this browser')
+  throw new Error(
+    'Your browser does not support secure random values. Please update it and try again.'
+  )
 }
 
 function ellipsize(text: string, maxLength: number) {
@@ -116,6 +119,15 @@ function drawWrappedText(
   let currentLine = ''
 
   for (const word of words) {
+    if (!currentLine && ctx.measureText(word).width > maxWidth) {
+      let shortenedWord = word
+      while (ctx.measureText(`${shortenedWord}…`).width > maxWidth && shortenedWord.length > 0) {
+        shortenedWord = shortenedWord.slice(0, -1)
+      }
+      lines.push(`${shortenedWord}…`)
+      continue
+    }
+
     const nextLine = currentLine ? `${currentLine} ${word}` : word
     if (ctx.measureText(nextLine).width <= maxWidth) {
       currentLine = nextLine
@@ -160,7 +172,7 @@ async function loadImage(url: string) {
     const image = new Image()
     image.crossOrigin = 'anonymous'
     image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('Unable to load image'))
+    image.onerror = () => reject(new Error(`Unable to load image from ${url}`))
     image.src = url
   })
 }
@@ -310,7 +322,9 @@ async function buildStoryCardImage({
         resolve(blob)
         return
       }
-      reject(new Error('Unable to generate story card'))
+      reject(
+        new Error('Failed to generate story card image. Please try again in a moment.')
+      )
     }, 'image/png')
   })
 }
@@ -690,7 +704,12 @@ export function ShareModal({
                   </div>
                   <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
                     <Instagram className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Open Instagram. If it does not land on Story automatically, tap <span className="font-medium text-foreground">+</span> and choose <span className="font-medium text-foreground">Story</span>.</p>
+                    <p>
+                      Open Instagram. If it does not land on Story automatically, tap the{' '}
+                      <span className="font-medium text-foreground">plus button</span> and
+                      choose the <span className="font-medium text-foreground">Story</span>{' '}
+                      option.
+                    </p>
                   </div>
                   <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
                     <Images className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -698,7 +717,7 @@ export function ShareModal({
                   </div>
                   <div className="flex items-start gap-3 rounded-xl bg-muted/25 p-3">
                     <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p>Paste the copied link into Instagram&apos;s Link sticker, then post your Story.</p>
+                    <p>Paste the copied link into Instagram's Link sticker, then post your Story.</p>
                   </div>
                 </div>
               </div>
