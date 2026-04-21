@@ -36,6 +36,7 @@ interface ShareModalProps {
 const STORY_CARD_WIDTH = 1080
 const STORY_CARD_HEIGHT = 1920
 const APP_LAUNCH_TIMEOUT_MS = 2200
+const DEEP_LINK_RETRY_DELAY_MS = 250
 const SLUG_SUFFIX_LENGTH = 12
 const STORY_MEDIA_FRAME = {
   x: 60,
@@ -579,7 +580,7 @@ export function ShareModal({
           console.warn('Instagram app deep link retry failed:', error)
         }
       }
-    }, 250)
+    }, DEEP_LINK_RETRY_DELAY_MS)
 
     // Only open the website as a fallback if the page is still visible after
     // giving the OS enough time to hand off to the app (APP_LAUNCH_TIMEOUT_MS).
