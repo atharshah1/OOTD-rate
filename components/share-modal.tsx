@@ -427,7 +427,7 @@ export function ShareModal({
   useEffect(() => {
     return () => {
       if (instagramFallbackTimeoutRef.current !== null) {
-        window.clearTimeout(instagramFallbackTimeoutRef.current)
+        clearTimeout(instagramFallbackTimeoutRef.current)
       }
     }
   }, [])
@@ -564,12 +564,12 @@ export function ShareModal({
 
   const openInstagramApp = () => {
     if (instagramFallbackTimeoutRef.current !== null) {
-      window.clearTimeout(instagramFallbackTimeoutRef.current)
+      clearTimeout(instagramFallbackTimeoutRef.current)
     }
 
     window.location.assign('instagram://camera')
 
-    instagramFallbackTimeoutRef.current = window.setTimeout(() => {
+    instagramFallbackTimeoutRef.current = setTimeout(() => {
       if (document.visibilityState === 'visible') {
         openInNewTab('https://www.instagram.com/')
       }
