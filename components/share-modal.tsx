@@ -155,12 +155,17 @@ export function ShareModal({
   }
 
   const openInstagramStory = async () => {
-    if (!shareUrl.trim()) return
+    const storyLink = shareUrl.trim()
+
+    if (!storyLink) {
+      toast.error('Share link is still generating. Please try again in a moment.')
+      return
+    }
 
     try {
-      await navigator.clipboard.writeText(shareUrl)
+      await navigator.clipboard.writeText(storyLink)
     } catch {
-      toast.error('Unable to copy link automatically. Use the copy button below.')
+      toast.error('Unable to copy link automatically. Use "Copy Link for Stories".')
     }
 
     const storyWebUrl = 'https://www.instagram.com/create/story/'
@@ -234,7 +239,7 @@ export function ShareModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-sm max-h-[90svh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="bg-card border-border sm:max-w-sm max-h-[90svh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share to Stories 📲</DialogTitle>
           <DialogDescription>
