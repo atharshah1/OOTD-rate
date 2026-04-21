@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Star, MessageCircle, Share2 } from 'lucide-react'
 import { RatingDialog } from './rating-dialog'
+import { ShareModal } from './share-modal'
 
 interface OOTDCardProps {
   id: string
@@ -15,6 +16,8 @@ interface OOTDCardProps {
   ratingCount: number
   averageRating: number
   commentCount: number
+  mediaType?: string
+  isOwner?: boolean
 }
 
 export function OOTDCard({
@@ -25,8 +28,11 @@ export function OOTDCard({
   ratingCount,
   averageRating,
   commentCount,
+  mediaType,
+  isOwner = false,
 }: OOTDCardProps) {
   const [showRatingDialog, setShowRatingDialog] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   return (
     <>
@@ -66,24 +72,47 @@ export function OOTDCard({
 
           {/* Actions */}
           <div className="flex gap-2">
-            <Button
-              onClick={() => setShowRatingDialog(true)}
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
-            >
-              Rate & Comment
-            </Button>
-            <Button variant="outline" size="sm" className="border-border">
-              <Share2 className="w-4 h-4" />
-            </Button>
+            {isOwner ? (
+              <Button
+                onClick={() => setShowShareModal(true)}
+                variant="outline"
+                size="sm"
+                className="ml-auto border-border"
+                aria-label="Share post"
+              >
+                <Share2 className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setShowRatingDialog(true)}
+                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
+              >
+                Rate & Comment
+              </Button>
+            )}
           </div>
         </div>
       </Card>
 
-      <RatingDialog
-        open={showRatingDialog}
-        onOpenChange={setShowRatingDialog}
-        postId={id}
-      />
+      {!isOwner && (
+        <RatingDialog
+          open={showRatingDialog}
+          onOpenChange={setShowRatingDialog}
+          postId={id}
+        />
+      )}
+
+      {isOwner && (
+        <ShareModal
+          open={showShareModal}
+          onOpenChange={setShowShareModal}
+          postId={id}
+          username={username}
+          mediaUrl={mediaUrl}
+          mediaType={mediaType}
+          caption={caption}
+        />
+      )}
     </>
   )
 }

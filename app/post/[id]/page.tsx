@@ -35,6 +35,8 @@ export default function PostPage() {
   const postId = params.id as string
   const [post, setPost] = useState<Post | null>(null)
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [showRatingDialog, setShowRatingDialog] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
@@ -42,8 +44,21 @@ export default function PostPage() {
   const router = useRouter()
 
   useEffect(() => {
+    fetchCurrentUser()
     fetchPost()
   }, [postId, supabase])
+
+  const fetchCurrentUser = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      setCurrentUserId(user?.id ?? null)
+    } finally {
+      setAuthChecked(true)
+    }
+  }
 
   const fetchPost = async () => {
     try {
@@ -77,7 +92,7 @@ export default function PostPage() {
     }
   }
 
-  if (loading) {
+  if (loading || !authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -97,6 +112,7 @@ export default function PostPage() {
   }
 
   const currentMedia = post.media?.[currentMediaIndex]
+  const isOwner = post.user_id === currentUserId
   const averageRating =
     post.ratings.length > 0
       ? post.ratings.reduce((sum, r) => sum + r.rating, 0) / post.ratings.length
@@ -265,22 +281,26 @@ export default function PostPage() {
 
             {/* Action Buttons */}
             <div className="space-y-2">
-              <Button
-                onClick={() => setShowRatingDialog(true)}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                size="lg"
-              >
-                Rate This OOTD
-              </Button>
-              <Button
-                onClick={() => setShowShareModal(true)}
-                variant="outline"
-                className="w-full border-border"
-                size="lg"
-              >
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </Button>
+              {!isOwner && (
+                <Button
+                  onClick={() => setShowRatingDialog(true)}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  size="lg"
+                >
+                  Rate This OOTD
+                </Button>
+              )}
+              {isOwner && (
+                <Button
+                  onClick={() => setShowShareModal(true)}
+                  variant="outline"
+                  className="w-full border-border"
+                  size="lg"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -292,22 +312,26 @@ export default function PostPage() {
       </main>
 
       {/* Rating Dialog */}
-      <RatingDialog
-        open={showRatingDialog}
-        onOpenChange={setShowRatingDialog}
-        postId={postId}
-      />
+      {!isOwner && (
+        <RatingDialog
+          open={showRatingDialog}
+          onOpenChange={setShowRatingDialog}
+          postId={postId}
+        />
+      )}
 
       {/* Share Modal */}
-      <ShareModal
-        open={showShareModal}
-        onOpenChange={setShowShareModal}
-        postId={postId}
-        username={post.users?.username}
-        mediaUrl={currentMedia?.media_url}
-        mediaType={currentMedia?.media_type}
-        caption={post.caption}
-      />
+      {isOwner && (
+        <ShareModal
+          open={showShareModal}
+          onOpenChange={setShowShareModal}
+          postId={postId}
+          username={post.users?.username}
+          mediaUrl={currentMedia?.media_url}
+          mediaType={currentMedia?.media_type}
+          caption={post.caption}
+        />
+      )}
     </div>
   )
 }

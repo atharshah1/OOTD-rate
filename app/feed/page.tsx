@@ -30,6 +30,7 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function FeedPage() {
         return
       }
 
+      setCurrentUserId(session.user.id)
       fetchPosts()
     }
 
@@ -143,11 +145,13 @@ export default function FeedPage() {
                   key={post.id}
                   id={post.id}
                   mediaUrl={firstMedia?.media_url || '/placeholder.jpg'}
+                  mediaType={firstMedia?.media_type}
                   caption={post.caption}
                   username={post.users?.username || 'Anonymous'}
                   ratingCount={post.ratings.length}
                   averageRating={averageRating}
                   commentCount={0}
+                  isOwner={post.user_id === currentUserId}
                 />
               )
             })}
