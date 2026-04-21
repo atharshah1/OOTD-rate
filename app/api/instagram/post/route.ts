@@ -68,9 +68,9 @@ export async function POST(request: NextRequest) {
       ? ownedPost.media
       : [ownedPost.media]
     : []
-  const ownsRequestedMedia = postMedia.some((item) => item.media_url === mediaUrl)
+  const isMediaOwned = postMedia.some((item) => item.media_url === mediaUrl)
 
-  if (!ownsRequestedMedia) {
+  if (!isMediaOwned) {
     return NextResponse.json(
       { error: 'Media does not belong to this post' },
       { status: 400 }
