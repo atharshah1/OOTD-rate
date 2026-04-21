@@ -37,7 +37,6 @@ interface ShareModalProps {
 
 const STORY_CARD_WIDTH = 1080
 const STORY_CARD_HEIGHT = 1920
-const APP_LAUNCH_CHECK_DELAY_MS = 1400
 const APP_LAUNCH_TIMEOUT_MS = 2200
 const SLUG_SUFFIX_LENGTH = 12
 
@@ -205,123 +204,72 @@ async function buildStoryCardImage({
     throw new Error('Canvas is unavailable')
   }
 
-  const backgroundGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
-  backgroundGradient.addColorStop(0, '#ff006e')
-  backgroundGradient.addColorStop(0.5, '#8f00ff')
-  backgroundGradient.addColorStop(1, '#00d9ff')
-  ctx.fillStyle = backgroundGradient
-  ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'
-  ctx.beginPath()
-  ctx.arc(180, 220, 180, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(900, 1500, 220, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = 'rgba(8,8,8,0.18)'
-  fillRoundedRect(ctx, 56, 72, 968, 1776, 56)
-
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '700 44px sans-serif'
-  ctx.fillText('Save this story card', 104, 154)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.84)'
-  ctx.font = '500 28px sans-serif'
-  ctx.fillText('It already includes your outfit + the exact sharing steps.', 104, 202)
-
-  ctx.fillStyle = '#0f0f12'
-  fillRoundedRect(ctx, 104, 258, 872, 1264, 44)
-
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '700 38px sans-serif'
-  ctx.fillText(`@${username}`, 148, 324)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.72)'
-  ctx.font = '500 28px sans-serif'
-  ctx.fillText('Rate my OOTD anonymously 👗', 148, 368)
-
-  const imageX = 148
-  const imageY = 416
-  const imageWidth = 784
-  const imageHeight = 700
-  const imageRadius = 36
-
+  // Draw background: outfit photo covering the full card, or a gradient fallback
   if (mediaUrl && mediaType !== 'video') {
     try {
       const mediaImage = await loadImage(mediaUrl)
-      const scale = Math.max(imageWidth / mediaImage.width, imageHeight / mediaImage.height)
+      const scale = Math.max(STORY_CARD_WIDTH / mediaImage.width, STORY_CARD_HEIGHT / mediaImage.height)
       const drawWidth = mediaImage.width * scale
       const drawHeight = mediaImage.height * scale
-      const drawX = imageX + (imageWidth - drawWidth) / 2
-      const drawY = imageY + (imageHeight - drawHeight) / 2
-
-      ctx.save()
-      roundedRectPath(ctx, imageX, imageY, imageWidth, imageHeight, imageRadius)
-      ctx.clip()
+      const drawX = (STORY_CARD_WIDTH - drawWidth) / 2
+      const drawY = (STORY_CARD_HEIGHT - drawHeight) / 2
       ctx.drawImage(mediaImage, drawX, drawY, drawWidth, drawHeight)
-      ctx.restore()
     } catch (error) {
       console.warn('Falling back to a gradient story card background:', error)
-      const fallbackGradient = ctx.createLinearGradient(imageX, imageY, imageX + imageWidth, imageY + imageHeight)
+      const fallbackGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
       fallbackGradient.addColorStop(0, '#2b2b40')
       fallbackGradient.addColorStop(1, '#111827')
       ctx.fillStyle = fallbackGradient
-      fillRoundedRect(ctx, imageX, imageY, imageWidth, imageHeight, imageRadius)
+      ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
     }
   } else {
-    const fallbackGradient = ctx.createLinearGradient(imageX, imageY, imageX + imageWidth, imageY + imageHeight)
-    fallbackGradient.addColorStop(0, '#2b2b40')
-    fallbackGradient.addColorStop(1, '#111827')
+    const fallbackGradient = ctx.createLinearGradient(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
+    fallbackGradient.addColorStop(0, '#ff006e')
+    fallbackGradient.addColorStop(0.5, '#8f00ff')
+    fallbackGradient.addColorStop(1, '#00d9ff')
     ctx.fillStyle = fallbackGradient
-    fillRoundedRect(ctx, imageX, imageY, imageWidth, imageHeight, imageRadius)
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '700 44px sans-serif'
-    ctx.fillText('Your story background', imageX + 48, imageY + 100)
-    ctx.fillStyle = 'rgba(255,255,255,0.72)'
-    ctx.font = '500 28px sans-serif'
-    ctx.fillText('Save this card, then pick it from Instagram gallery.', imageX + 48, imageY + 148)
+    ctx.fillRect(0, 0, STORY_CARD_WIDTH, STORY_CARD_HEIGHT)
   }
 
-  ctx.fillStyle = 'rgba(0,0,0,0.55)'
-  fillRoundedRect(ctx, imageX + 36, imageY + imageHeight - 152, imageWidth - 72, 112, 28)
+  // Top gradient overlay for username readability
+  const topOverlay = ctx.createLinearGradient(0, 0, 0, 320)
+  topOverlay.addColorStop(0, 'rgba(0,0,0,0.65)')
+  topOverlay.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = topOverlay
+  ctx.fillRect(0, 0, STORY_CARD_WIDTH, 320)
+
+  // Username
   ctx.fillStyle = '#ffffff'
-  ctx.font = '700 34px sans-serif'
-  ctx.fillText('Tap the Link sticker after you upload this image', imageX + 68, imageY + imageHeight - 88)
+  ctx.font = '700 52px sans-serif'
+  ctx.fillText(`@${username}`, 72, 120)
 
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '700 34px sans-serif'
-  ctx.fillText('How to post it', 148, 1200)
+  ctx.fillStyle = 'rgba(255,255,255,0.80)'
+  ctx.font = '500 36px sans-serif'
+  ctx.fillText('Rate my OOTD 👗', 72, 176)
 
-  const steps = [
-    '1. Save this image to your phone',
-    '2. Open Instagram and start a Story',
-    '3. Pick this saved image from your gallery',
-    '4. Paste the copied link into the Link sticker',
-  ]
+  // Bottom gradient overlay for share URL readability
+  const bottomOverlay = ctx.createLinearGradient(0, STORY_CARD_HEIGHT - 320, 0, STORY_CARD_HEIGHT)
+  bottomOverlay.addColorStop(0, 'rgba(0,0,0,0)')
+  bottomOverlay.addColorStop(1, 'rgba(0,0,0,0.75)')
+  ctx.fillStyle = bottomOverlay
+  ctx.fillRect(0, STORY_CARD_HEIGHT - 320, STORY_CARD_WIDTH, 320)
 
-  ctx.font = '500 30px sans-serif'
-  let stepY = 1262
-  for (const step of steps) {
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'
-    fillRoundedRect(ctx, 148, stepY - 42, 784, 80, 22)
-    ctx.fillStyle = '#ffffff'
-    drawWrappedText(ctx, step, 176, stepY + 6, 728, 34, 2)
-    stepY += 102
-  }
-
+  // Caption (if provided)
   if (caption) {
-    ctx.fillStyle = 'rgba(255,255,255,0.72)'
-    ctx.font = '500 26px sans-serif'
-    drawWrappedText(ctx, ellipsize(caption, 100), 148, 1688, 784, 30, 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.88)'
+    ctx.font = '500 34px sans-serif'
+    drawWrappedText(ctx, ellipsize(caption, 120), 72, STORY_CARD_HEIGHT - 220, STORY_CARD_WIDTH - 144, 44, 2)
   }
 
-  ctx.fillStyle = '#ffffff'
-  fillRoundedRect(ctx, 148, 1768, 784, 64, 24)
+  // Share URL pill at the bottom
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'
+  fillRoundedRect(ctx, 72, STORY_CARD_HEIGHT - 140, STORY_CARD_WIDTH - 144, 80, 40)
   ctx.fillStyle = '#0f0f12'
-  ctx.font = '700 28px sans-serif'
-  ctx.fillText(getShareLabel(shareUrl), 180, 1811)
+  ctx.font = '700 32px sans-serif'
+  const urlLabel = getShareLabel(shareUrl)
+  const urlMetrics = ctx.measureText(urlLabel)
+  const urlX = (STORY_CARD_WIDTH - urlMetrics.width) / 2
+  ctx.fillText(urlLabel, urlX, STORY_CARD_HEIGHT - 88)
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -567,14 +515,23 @@ export function ShareModal({
       clearTimeout(instagramFallbackTimeoutRef.current)
     }
 
-    window.location.assign('instagram://camera')
+    // Use a hidden anchor click to trigger the deep link — more reliable on
+    // iOS Safari and Android Chrome than window.location.assign.
+    const anchor = document.createElement('a')
+    anchor.href = 'instagram://camera'
+    anchor.style.display = 'none'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
 
+    // Only open the website as a fallback if the page is still visible after
+    // giving the OS enough time to hand off to the app (APP_LAUNCH_TIMEOUT_MS).
     instagramFallbackTimeoutRef.current = setTimeout(() => {
       if (document.visibilityState === 'visible') {
         openInNewTab('https://www.instagram.com/')
       }
       instagramFallbackTimeoutRef.current = null
-    }, Math.min(APP_LAUNCH_CHECK_DELAY_MS, APP_LAUNCH_TIMEOUT_MS))
+    }, APP_LAUNCH_TIMEOUT_MS)
   }
 
   const openInstagramStory = async () => {
