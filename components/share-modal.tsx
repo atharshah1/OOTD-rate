@@ -861,15 +861,6 @@ export function ShareModal({
                 </div>
               </details>
 
-              {/* Connect Instagram prompt */}
-              {!hasInstagramToken && (
-                <p className="text-xs text-muted-foreground text-center">
-                  <a href="/auth/signin" className="text-primary hover:underline">
-                    Connect Instagram
-                  </a>{' '}
-                  to post directly to your feed or Reels.
-                </p>
-              )}
             </>
           )}
         </div>
